@@ -29,14 +29,13 @@ export async function handleNewTokens(newTokens: Image[]) {
                     persistedToken.metadata,
                 )) {
                     // We can write the metadata key if:
+                    // - it doesn't exist yet
                     // - it's a unique token and we have a more recent value
-                    // - it's a template token and the value isn't there yet
                     if (
+                        !(key in token.metadata) ||
                         (persistedToken.type === "UNIQUE" &&
                             Date.parse(token.lastModified) <
-                                persistedToken.lastModified) ||
-                        (persistedToken.type === "TEMPLATE" &&
-                            !(key in token.metadata))
+                                persistedToken.lastModified)
                     ) {
                         token.metadata[key] = value;
                     }
