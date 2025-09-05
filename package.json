@@ -1,8 +1,8 @@
 {
-    "name": "owlbear-template",
+    "name": "owlbear-persistence",
     "type": "module",
-    "version": "0.0.11",
-    "description": "TODO extension description",
+    "version": "1.0.0",
+    "description": "Persist token data between scenes and create token templates.",
     "scripts": {
         "dev": "vite",
         "build": "pnpm docs:build && tsc --build && vite build",

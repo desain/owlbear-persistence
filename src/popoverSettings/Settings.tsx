@@ -4,11 +4,9 @@ import { EXTENSION_NAME } from "../constants";
 import { usePlayerStorage } from "../state/usePlayerStorage";
 
 export function Settings() {
-    const toolEnabled = usePlayerStorage((store) => store.toolEnabled);
     const contextMenuEnabled = usePlayerStorage(
         (store) => store.contextMenuEnabled,
     );
-    const setToolEnabled = usePlayerStorage((store) => store.setToolEnabled);
     const setContextMenuEnabled = usePlayerStorage(
         (store) => store.setContextMenuEnabled,
     );
@@ -17,17 +15,6 @@ export function Settings() {
             <Typography variant="h6" sx={{ mb: 2 }}>
                 {EXTENSION_NAME} Settings
             </Typography>
-            <FormControlLabel
-                control={
-                    <Switch
-                        checked={toolEnabled}
-                        onChange={(e) => setToolEnabled(e.target.checked)}
-                    />
-                }
-                label="Enable Tool"
-                sx={{ mb: 2 }}
-            />
-            <br />
             <FormControlLabel
                 control={
                     <Switch

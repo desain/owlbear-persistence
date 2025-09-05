@@ -1,72 +1,74 @@
-import OBR, { type Theme } from "@owlbear-rodeo/sdk";
+import {
+    type Image,
+    type ImageContent,
+    type Item,
+    type Metadata,
+    type Theme,
+} from "@owlbear-rodeo/sdk";
 import { enableMapSet } from "immer";
-import { WHITE_HEX, type ExtractNonFunctions } from "owlbear-utils";
+import { WHITE_HEX, type ExtractNonFunctions, type Role } from "owlbear-utils";
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import { handleNewTokens } from "../action/applyPersisted";
 import { LOCAL_STORAGE_STORE_NAME } from "../constants";
+import { isToken, type Token } from "../Token";
 
 enableMapSet();
 
-const SET_SENSIBLE = Symbol("SetSensible");
-
-const ObrSceneReady = new Promise<void>((resolve) => {
-    OBR.onReady(async () => {
-        if (await OBR.scene.isReady()) {
-            resolve();
-        } else {
-            const unsubscribeScene = OBR.scene.onReadyChange((ready) => {
-                if (ready) {
-                    unsubscribeScene();
-                    resolve();
-                }
-            });
-        }
-    });
-});
-
-/**
- * @returns Default values for persisted local storage that depend on an OBR scene.
- */
-async function fetchDefaults(): Promise<null> {
-    await ObrSceneReady;
-    return null;
+export type PersistenceType = "TEMPLATE" | "UNIQUE";
+export interface PersistedToken {
+    readonly imageUrl: string;
+    readonly name: string;
+    readonly metadata: Metadata;
+    readonly type: PersistenceType;
+    readonly lastModified: number;
 }
 
 interface LocalStorage {
-    readonly hasSensibleValues: boolean;
-    readonly toolEnabled: boolean;
     readonly contextMenuEnabled: boolean;
-    readonly [SET_SENSIBLE]: (this: void) => void;
-    readonly setToolEnabled: (this: void, toolEnabled: boolean) => void;
+    readonly tokens: PersistedToken[];
     readonly setContextMenuEnabled: (
         this: void,
         contextMenuEnabled: boolean,
     ) => void;
+    readonly persist: (
+        this: void,
+        tokens: { token: Token; type: PersistenceType }[],
+    ) => void;
+    readonly setType: (
+        this: void,
+        url: ImageContent["url"],
+        type: PersistenceType,
+    ) => void;
+    readonly setTokenName: (
+        this: void,
+        url: ImageContent["url"],
+        name: string,
+    ) => void;
+    readonly removeToken: (this: void, url: ImageContent["url"]) => void;
 }
 function partializeLocalStorage({
-    hasSensibleValues,
-    toolEnabled,
     contextMenuEnabled,
+    tokens,
 }: LocalStorage): ExtractNonFunctions<LocalStorage> {
-    return { hasSensibleValues, toolEnabled, contextMenuEnabled };
+    return { contextMenuEnabled, tokens };
 }
 
 interface OwlbearStore {
     readonly sceneReady: boolean;
+    readonly role: Role;
     readonly theme: Theme;
-    // readonly role: Role;
     // readonly playerId: string;
     // readonly grid: GridParsed;
-    // readonly lastNonemptySelection: string[];
-    // readonly lastNonemptySelectionItems: Item[];
+    readonly images: Map<Image["id"], number>;
     // readonly roomMetadata: RoomMetadata;
     readonly setSceneReady: (this: void, sceneReady: boolean) => void;
-    // readonly setRole: (this: void, role: Role) => void;
+    readonly setRole: (this: void, role: Role) => void;
     // readonly setPlayerId: (this: void, playerId: string) => void;
     // readonly setGrid: (this: void, grid: GridParams) => Promise<void>;
     // readonly setSelection: (this: void, selection: string[] | undefined) => Promise<void>;
-    // readonly handleItemsChange: (this: void, items: Item[]) => void;
+    readonly handleItemsChange: (this: void, items: Item[]) => void;
     // readonly handleRoomMetadataChange: (this: void, metadata: Metadata) => void;
     readonly handleThemeChange: (this: void, theme: Theme) => void;
 
@@ -97,21 +99,84 @@ interface OwlbearStore {
     */
 }
 
+export function getPersistedToken<T extends LocalStorage>(
+    state: T,
+    url: ImageContent["url"],
+): T["tokens"][number] | undefined {
+    return state.tokens.find((token) => token.imageUrl === url);
+}
+
 export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
     subscribeWithSelector(
         persist(
             immer((set) => ({
                 // local storage
-                hasSensibleValues: false,
-                toolEnabled: false,
-                contextMenuEnabled: false,
-                [SET_SENSIBLE]: () => set({ hasSensibleValues: true }),
-                setToolEnabled: (toolEnabled) => set({ toolEnabled }),
+                contextMenuEnabled: true,
+                tokens: [],
                 setContextMenuEnabled: (contextMenuEnabled) =>
                     set({ contextMenuEnabled }),
+                persist: (tokens) =>
+                    set((state) => {
+                        for (const { token, type } of tokens) {
+                            // check if token is already persisted
+                            const persistedToken = getPersistedToken(
+                                state,
+                                token.image.url,
+                            );
+                            if (persistedToken?.type === "UNIQUE") {
+                                console.warn("token is already persisted");
+                                continue;
+                            } else if (
+                                persistedToken?.type === "TEMPLATE" &&
+                                type === "TEMPLATE"
+                            ) {
+                                // update template
+                                persistedToken.lastModified = Date.parse(
+                                    token.lastModified,
+                                );
+                                persistedToken.metadata = token.metadata;
+                            } else if (!persistedToken) {
+                                // no existing token
+                                state.tokens.push({
+                                    imageUrl: token.image.url,
+                                    lastModified: Date.parse(
+                                        token.lastModified,
+                                    ),
+                                    metadata: token.metadata,
+                                    name: token.text.plainText || token.name,
+                                    type,
+                                });
+                            }
+                        }
+                    }),
+                setType: (url, type) =>
+                    set((state) => {
+                        const token = getPersistedToken(state, url);
+                        if (token) {
+                            token.type = type;
+                        }
+                    }),
+                setTokenName: (url, name) =>
+                    set((state) => {
+                        const token = getPersistedToken(state, url);
+                        if (token) {
+                            token.name = name;
+                        }
+                    }),
+                removeToken: (url) =>
+                    set((state) => {
+                        const idx = state.tokens.findIndex(
+                            (token) => token.imageUrl === url,
+                        );
+                        if (idx >= 0) {
+                            state.tokens.splice(idx, 1);
+                        }
+                    }),
 
                 // owlbear store
                 sceneReady: false,
+                role: "PLAYER",
+                images: new Map(),
                 theme: {
                     background: {
                         default: WHITE_HEX,
@@ -137,7 +202,6 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                         main: WHITE_HEX,
                     },
                 },
-                // role: "PLAYER",
                 // playerId: "NONE",
                 // grid: {
                 //     dpi: -1,
@@ -149,11 +213,15 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 //         multiplier: 5,
                 //     },
                 // },
-                // lastNonemptySelection: [],
-                // lastNonemptySelectionItems: [],
                 // roomMetadata: { _key: true },
-                setSceneReady: (sceneReady: boolean) => set({ sceneReady }),
-                // setRole: (role: Role) => set({ role }),
+                setSceneReady: (sceneReady: boolean) =>
+                    set((state) => {
+                        state.sceneReady = sceneReady;
+                        if (!sceneReady) {
+                            state.images.clear();
+                        }
+                    }),
+                setRole: (role: Role) => set({ role }),
                 // setPlayerId: (playerId: string) => set({ playerId }),
                 // setGrid: async (grid: GridParams) => {
                 //     const parsedScale = (await OBR.scene.grid.getScale())
@@ -176,43 +244,59 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 //         });
                 //     }
                 // },
-                // handleItemsChange: (items: Item[]) =>
-                //     set((state) => {
-                //         const lastNonemptySelectionItems = items.filter(
-                //             (item) =>
-                //                 state.lastNonemptySelection.includes(item.id),
-                //         );
-                //         return {
-                //             lastNonemptySelectionItems,
-                //         };
-                //     }),
+                handleItemsChange: (items: Item[]) =>
+                    set((state) => {
+                        const images = items.filter(isToken);
+
+                        const newImages: Image[] = [];
+                        // Update persisted tokens
+                        for (const image of images) {
+                            const lastModified = Date.parse(image.lastModified);
+                            const prevLastModified = state.images.get(image.id);
+
+                            if (prevLastModified !== undefined) {
+                                // image already existed
+                                if (prevLastModified < lastModified) {
+                                    // image was updated
+                                    const token = getPersistedToken(
+                                        state,
+                                        image.image.url,
+                                    );
+                                    if (token && token.type === "UNIQUE") {
+                                        token.lastModified = lastModified;
+                                        token.metadata = image.metadata;
+                                    }
+                                }
+                            } else {
+                                // image is new
+                                newImages.push(image);
+                            }
+                        }
+
+                        // Save existing images for next time
+                        state.images = new Map(
+                            images.map(({ id, lastModified }) => [
+                                id,
+                                Date.parse(lastModified),
+                            ]),
+                        );
+
+                        // Populate new tokens from persisted data
+                        if (state.role === "GM") {
+                            void handleNewTokens(newImages);
+                        }
+                    }),
                 // handleRoomMetadataChange: (metadata) => {
                 //     const roomMetadata = metadata[METADATA_KEY_ROOM];
                 //     if (isRoomMetadata(roomMetadata)) {
                 //         set({ roomMetadata });
                 //     }
                 // },
-                handleThemeChange: (theme) => {
-                    set({ theme });
-                },
+                handleThemeChange: (theme) => set({ theme }),
             })),
             {
                 name: LOCAL_STORAGE_STORE_NAME,
                 partialize: partializeLocalStorage,
-                onRehydrateStorage: () => (state, error) => {
-                    if (state) {
-                        if (!state.hasSensibleValues) {
-                            void fetchDefaults().then(() => {
-                                state[SET_SENSIBLE]();
-                            });
-                        }
-                    } else if (error) {
-                        console.error(
-                            "Error hydrating player settings store",
-                            error,
-                        );
-                    }
-                },
             },
         ),
     ),
