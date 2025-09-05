@@ -1,6 +1,7 @@
 import OBR from "@owlbear-rodeo/sdk";
 import { deferCallAll } from "owlbear-utils";
 import { version } from "../package.json";
+import { installActionIconWatcher } from "./action/actionIconWatcher";
 import { installBroadcastListener } from "./broadcast/broadcast";
 import { EXTENSION_NAME } from "./constants";
 import { startWatchingContextMenuEnabled } from "./contextmenu/contextmenu";
@@ -17,11 +18,13 @@ export function install() {
 
         const stopWatchingContextMenu = await startWatchingContextMenuEnabled();
         const uninstallBroadcastListener = installBroadcastListener();
+        const uninstallActionIconWatcher = installActionIconWatcher();
 
         return deferCallAll(
             () => console.log(`Uninstalling ${EXTENSION_NAME}`),
             stopWatchingContextMenu,
             uninstallBroadcastListener,
+            uninstallActionIconWatcher,
         );
     }
 

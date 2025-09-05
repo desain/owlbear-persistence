@@ -55,13 +55,28 @@ function partializeLocalStorage({
     return { contextMenuEnabled, tokens };
 }
 
+function getUrlUsage(tokens: Token[]): Map<ImageContent["url"], number> {
+    const map = new Map<ImageContent["url"], number>();
+    for (const token of tokens) {
+        map.set(token.image.url, (map.get(token.image.url) ?? 0) + 1);
+    }
+    return map;
+}
+
 interface OwlbearStore {
     readonly sceneReady: boolean;
     readonly role: Role;
     readonly theme: Theme;
     // readonly playerId: string;
     // readonly grid: GridParsed;
-    readonly images: Map<Image["id"], number>;
+    /**
+     * Image -> last modified unix timestamp (used to track updates).
+     */
+    readonly tokensInScene: Map<Image["id"], number>;
+    /**
+     * URL to usage count.
+     */
+    readonly urlUsage: Map<ImageContent["url"], number>;
     // readonly roomMetadata: RoomMetadata;
     readonly setSceneReady: (this: void, sceneReady: boolean) => void;
     readonly setRole: (this: void, role: Role) => void;
@@ -176,7 +191,8 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 // owlbear store
                 sceneReady: false,
                 role: "PLAYER",
-                images: new Map(),
+                tokensInScene: new Map(),
+                urlUsage: new Map(),
                 theme: {
                     background: {
                         default: WHITE_HEX,
@@ -218,7 +234,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     set((state) => {
                         state.sceneReady = sceneReady;
                         if (!sceneReady) {
-                            state.images.clear();
+                            state.tokensInScene.clear();
                         }
                     }),
                 setRole: (role: Role) => set({ role }),
@@ -246,36 +262,47 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 // },
                 handleItemsChange: (items: Item[]) =>
                     set((state) => {
-                        const images = items.filter(isToken);
+                        const tokens = items.filter(isToken);
 
-                        const newImages: Image[] = [];
+                        state.urlUsage = getUrlUsage(tokens);
+
+                        const newTokens: Image[] = [];
                         // Update persisted tokens
-                        for (const image of images) {
-                            const lastModified = Date.parse(image.lastModified);
-                            const prevLastModified = state.images.get(image.id);
+                        for (const token of tokens) {
+                            const lastModified = Date.parse(token.lastModified);
+                            const prevLastModified = state.tokensInScene.get(
+                                token.id,
+                            );
 
                             if (prevLastModified !== undefined) {
                                 // image already existed
                                 if (prevLastModified < lastModified) {
                                     // image was updated
-                                    const token = getPersistedToken(
+                                    const persistedToken = getPersistedToken(
                                         state,
-                                        image.image.url,
+                                        token.image.url,
                                     );
-                                    if (token && token.type === "UNIQUE") {
-                                        token.lastModified = lastModified;
-                                        token.metadata = image.metadata;
+                                    if (
+                                        persistedToken &&
+                                        persistedToken.type === "UNIQUE" &&
+                                        state.urlUsage.get(token.image.url) ===
+                                            1
+                                    ) {
+                                        persistedToken.lastModified =
+                                            lastModified;
+                                        persistedToken.metadata =
+                                            token.metadata;
                                     }
                                 }
                             } else {
                                 // image is new
-                                newImages.push(image);
+                                newTokens.push(token);
                             }
                         }
 
                         // Save existing images for next time
-                        state.images = new Map(
-                            images.map(({ id, lastModified }) => [
+                        state.tokensInScene = new Map(
+                            tokens.map(({ id, lastModified }) => [
                                 id,
                                 Date.parse(lastModified),
                             ]),
@@ -283,7 +310,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
 
                         // Populate new tokens from persisted data
                         if (state.role === "GM") {
-                            void handleNewTokens(newImages);
+                            void handleNewTokens(newTokens);
                         }
                     }),
                 // handleRoomMetadataChange: (metadata) => {

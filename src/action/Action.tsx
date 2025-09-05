@@ -69,6 +69,7 @@ function TokenCard({
     const setType = usePlayerStorage((s) => s.setType);
     const setName = usePlayerStorage((s) => s.setTokenName);
     const removeToken = usePlayerStorage((s) => s.removeToken);
+    const urlUsage = usePlayerStorage((s) => s.urlUsage);
 
     async function handleSelect(url: ImageContent["url"]) {
         const items = await OBR.scene.items.getItems(
@@ -95,7 +96,8 @@ function TokenCard({
         />
     );
 
-    const hasWarning = true;
+    const hasWarning =
+        token.type === "UNIQUE" && (urlUsage.get(token.imageUrl) ?? 0) > 1;
 
     return (
         <Accordion

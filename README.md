@@ -49,7 +49,6 @@ To make a production build run:
 ## To do
 
 -   Include attachments
--   Warning + no sync when multiple unique tokens
 
 ## License
 
