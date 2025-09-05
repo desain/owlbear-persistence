@@ -50,7 +50,6 @@ To make a production build run:
 
 -   Include attachments
 -   Warning + no sync when multiple unique tokens
--   Search
 
 ## License
 

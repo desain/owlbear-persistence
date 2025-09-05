@@ -5,6 +5,7 @@ import {
     Person,
     Search,
     Settings,
+    Warning,
 } from "@mui/icons-material";
 import Edit from "@mui/icons-material/Edit";
 import {
@@ -12,6 +13,7 @@ import {
     AccordionDetails,
     AccordionSummary,
     Alert,
+    Badge,
     Box,
     CardHeader,
     CardMedia,
@@ -29,6 +31,7 @@ import type { FuzzyResult, Range } from "@nozbe/microfuzz";
 import { Highlight, useFuzzySearchList } from "@nozbe/microfuzz/react";
 import type { ImageContent } from "@owlbear-rodeo/sdk";
 import OBR from "@owlbear-rodeo/sdk";
+import { filesize } from "filesize";
 import { Control, getId, useActionResizer, useRehydrate } from "owlbear-utils";
 import React, { useRef, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
@@ -50,15 +53,6 @@ function formatTimestamp(ts?: number) {
     } catch {
         return String(ts);
     }
-}
-
-function formatKb(s: string | undefined) {
-    if (!s) {
-        return "0 KB";
-    }
-    const bytes = new TextEncoder().encode(s).length;
-    const kb = bytes / 1024;
-    return `${kb.toFixed(2)} KB`;
 }
 
 function TokenCard({
@@ -85,6 +79,24 @@ function TokenCard({
         }
     }
 
+    const image = (
+        <CardMedia
+            component="img"
+            image={token.imageUrl}
+            alt={token.name}
+            sx={{
+                width: 48,
+                height: 48,
+            }}
+            onClick={(e) => {
+                e.stopPropagation();
+                return handleSelect(token.imageUrl);
+            }}
+        />
+    );
+
+    const hasWarning = true;
+
     return (
         <Accordion
             expanded={expanded}
@@ -97,19 +109,17 @@ function TokenCard({
                 slotProps={{ content: { sx: { m: 0 } } }}
             >
                 <Stack direction="row" alignItems="center">
-                    <CardMedia
-                        component="img"
-                        image={token.imageUrl}
-                        alt={token.name}
-                        sx={{
-                            width: 48,
-                            height: 48,
-                        }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            return handleSelect(token.imageUrl);
-                        }}
-                    />
+                    {hasWarning ? (
+                        <Badge
+                            color="warning"
+                            overlap="circular"
+                            badgeContent={<Warning fontSize="small" />}
+                        >
+                            {image}
+                        </Badge>
+                    ) : (
+                        image
+                    )}
                     <CardHeader
                         title={
                             highlightRanges ? (
@@ -121,7 +131,9 @@ function TokenCard({
                                 token.name
                             )
                         }
-                        subheader={formatKb(JSON.stringify(token.metadata))}
+                        subheader={filesize(
+                            JSON.stringify(token.metadata).length,
+                        )}
                         slotProps={{
                             title: {
                                 variant: "body1",
@@ -135,6 +147,12 @@ function TokenCard({
             </AccordionSummary>
             <AccordionDetails>
                 <Stack spacing={1}>
+                    {hasWarning && (
+                        <Alert severity="warning">
+                            The scene contains more than one of this unique
+                            token. The persisted token will not update.
+                        </Alert>
+                    )}
                     <Stack
                         direction="row"
                         alignItems="center"
@@ -274,12 +292,14 @@ export function Action() {
                     placeholder="Search tokens"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <Search fontSize="small" />
-                            </InputAdornment>
-                        ),
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search fontSize="small" />
+                                </InputAdornment>
+                            ),
+                        },
                     }}
                     sx={{ mb: 1 }}
                 />
