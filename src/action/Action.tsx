@@ -3,6 +3,7 @@ import {
     ExpandMore,
     Group,
     Person,
+    Search,
     Settings,
 } from "@mui/icons-material";
 import Edit from "@mui/icons-material/Edit";
@@ -16,12 +17,16 @@ import {
     CardMedia,
     Divider,
     IconButton,
+    InputAdornment,
     Stack,
+    TextField,
     ToggleButton,
     ToggleButtonGroup,
     Tooltip,
     Typography,
 } from "@mui/material";
+import type { FuzzyResult, Range } from "@nozbe/microfuzz";
+import { Highlight, useFuzzySearchList } from "@nozbe/microfuzz/react";
 import type { ImageContent } from "@owlbear-rodeo/sdk";
 import OBR from "@owlbear-rodeo/sdk";
 import { Control, getId, useActionResizer, useRehydrate } from "owlbear-utils";
@@ -60,10 +65,12 @@ function TokenCard({
     token,
     expanded,
     setExpanded,
+    highlightRanges,
 }: {
     token: PersistedToken;
     expanded: boolean;
     setExpanded: (expanded: string | null) => void;
+    highlightRanges?: Range[];
 }) {
     const setType = usePlayerStorage((s) => s.setType);
     const setName = usePlayerStorage((s) => s.setTokenName);
@@ -104,7 +111,16 @@ function TokenCard({
                         }}
                     />
                     <CardHeader
-                        title={token.name}
+                        title={
+                            highlightRanges ? (
+                                <Highlight
+                                    text={token.name}
+                                    ranges={highlightRanges}
+                                />
+                            ) : (
+                                token.name
+                            )
+                        }
                         subheader={formatKb(JSON.stringify(token.metadata))}
                         slotProps={{
                             title: {
@@ -199,6 +215,7 @@ export function Action() {
     const box: React.RefObject<HTMLElement | null> = useRef(null);
 
     const [expanded, setExpanded] = useState<string | null>();
+    const [query, setQuery] = useState("");
 
     const BASE_HEIGHT = 50;
     const MAX_HEIGHT = 700;
@@ -208,9 +225,22 @@ export function Action() {
     const role = usePlayerStorage((s) => s.role);
     const tokens = usePlayerStorage((store) => store.tokens);
 
-    const tokensSorted = [...tokens].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    );
+    // we use microfuzz's Highlight component to render matched ranges
+
+    // use microfuzz React hook for fuzzy searching tokensSorted by name
+    const filtered = useFuzzySearchList<
+        PersistedToken,
+        { token: PersistedToken; highlightRanges?: Range[] }
+    >({
+        list: tokens,
+        queryText: query,
+        getText: (item: PersistedToken) => [item.name],
+        mapResultItem: (res: FuzzyResult<PersistedToken>) => ({
+            token: res.item,
+            highlightRanges: res.matches[0] ?? undefined,
+        }),
+        strategy: "smart",
+    });
 
     return role === "PLAYER" ? (
         <Alert severity="warning">
@@ -239,18 +269,38 @@ export function Action() {
             <Divider sx={{ mb: 1 }} />
 
             <Stack spacing={1} sx={{ p: 0 }}>
-                {tokensSorted.length === 0 ? (
+                <TextField
+                    size="small"
+                    placeholder="Search tokens"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <Search fontSize="small" />
+                            </InputAdornment>
+                        ),
+                    }}
+                    sx={{ mb: 1 }}
+                />
+
+                {tokens.length === 0 ? (
                     <Typography color="text.secondary">
                         No tokens saved. Right click a token to persist it.
                     </Typography>
+                ) : filtered.length === 0 ? (
+                    <Typography color="text.secondary">
+                        No results found.
+                    </Typography>
                 ) : (
                     <Stack spacing={2}>
-                        {tokensSorted.map((token) => (
+                        {filtered.map(({ token, highlightRanges }) => (
                             <TokenCard
                                 key={token.imageUrl}
                                 expanded={expanded === token.imageUrl}
                                 setExpanded={setExpanded}
                                 token={token}
+                                highlightRanges={highlightRanges}
                             />
                         ))}
                         <Typography color="textSecondary">
