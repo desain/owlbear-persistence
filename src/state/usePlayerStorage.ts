@@ -5,7 +5,7 @@ import {
     type Theme,
 } from "@owlbear-rodeo/sdk";
 import { enableMapSet, type WritableDraft } from "immer";
-import { WHITE_HEX, type ExtractNonFunctions, type Role } from "owlbear-utils";
+import { getAllAttachments, toItemMap, WHITE_HEX, type ExtractNonFunctions, type ItemMap, type Role } from "owlbear-utils";
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
@@ -13,7 +13,6 @@ import { applyPersisted } from "../action/applyPersisted";
 import { processAttachments } from "../action/processAttachments";
 import { LOCAL_STORAGE_STORE_NAME } from "../constants";
 import { isToken, type Token } from "../Token";
-import { getAllAttachments, toItemMap, type ItemMap } from "./ItemMap";
 
 enableMapSet();
 
