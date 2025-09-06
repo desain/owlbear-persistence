@@ -4,8 +4,8 @@ Persist token data between scenes and create token templates.
 
 ## Features
 
--   💾 Persist token metadata between scenes.
--   ♊️ Create token templates to apply metadata when tokens are created.
+-   💾 Persist token metadata and attachments between scenes.
+-   ♊️ Create token templates to apply metadata and attachments when tokens are created.
 
 ## How to use
 
@@ -48,8 +48,11 @@ To make a production build run:
 
 ## To do
 
+-   Don't try to focus viewport if scene is gone
+-   Don't apply unique persisted if there's already a unique token of the same url in the scene
 -   Immediate sync after deleting a scene token so a persisted token is no longer overused
 -   "original URL" metadata key
+-   Apply persisted tokens on rehydrate storage event? For "multi room in different scenes using the same token" cases.
 
 ## License
 
