@@ -5,6 +5,7 @@ import OBR, {
     type Layer,
 } from "@owlbear-rodeo/sdk";
 import { getId } from "owlbear-utils";
+import { applyPersisted } from "../action/applyPersisted";
 import load from "../assets/load.svg";
 import save from "../assets/save.svg";
 import {
@@ -13,7 +14,6 @@ import {
     ID_CONTEXTMENU_SAVE_TEMPLATE,
 } from "../constants";
 import {
-    getPersistedToken,
     usePlayerStorage,
     type PersistedToken,
 } from "../state/usePlayerStorage";
@@ -76,6 +76,19 @@ function installPersistContextMenu(tokens: PersistedToken[]) {
         ],
         onClick: async ({ items }) => {
             const tokens = items.filter(isToken);
+            const attachmentses = await Promise.all(
+                tokens.map((token) =>
+                    OBR.scene.items
+                        .getItemAttachments([token.id])
+                        .then((attachments) =>
+                            attachments.filter(
+                                (attachment) => attachment.id !== token.id,
+                            ),
+                        ),
+                ),
+            );
+
+            // Find URLs that are already used to determine persistence type
             const selectedIds = new Set(tokens.map(getId));
             const alreadyUsedUrls = new Set(
                 (await OBR.scene.items.getItems(isImage))
@@ -83,12 +96,15 @@ function installPersistContextMenu(tokens: PersistedToken[]) {
                     .filter((item) => !selectedIds.has(getId(item)))
                     .map((item) => item.image.url),
             );
+
+            // Save
             usePlayerStorage.getState().persist(
-                tokens.map((token) => ({
+                tokens.map((token, i) => ({
                     token,
                     type: alreadyUsedUrls.has(token.image.url)
                         ? "TEMPLATE"
                         : "UNIQUE",
+                    attachments: attachmentses[i],
                 })),
             );
         },
@@ -124,14 +140,30 @@ function installTemplateContextMenus(tokens: PersistedToken[]) {
                     filter: templateFilter,
                 },
             ],
-            onClick: ({ items }) => {
+            onClick: async ({ items }) => {
                 const tokens = items.filter(isToken);
+                const attachmentses = await Promise.all(
+                    tokens.map((token) =>
+                        OBR.scene.items
+                            .getItemAttachments([token.id])
+                            .then((attachments) =>
+                                attachments.filter(
+                                    (attachment) => attachment.id !== token.id,
+                                ),
+                            ),
+                    ),
+                );
+
+                // Save template/s
                 usePlayerStorage.getState().persist(
-                    tokens.map((token) => ({
+                    tokens.map((token, i) => ({
                         token,
                         type: "TEMPLATE",
+                        attachments: attachmentses[i],
                     })),
                 );
+
+                // Show notification
                 const plural = items.length > 1;
                 void OBR.player.deselect();
                 void OBR.notification.show(
@@ -150,26 +182,13 @@ function installTemplateContextMenus(tokens: PersistedToken[]) {
                 },
             ],
             onClick: async ({ items }) => {
-                const state = usePlayerStorage.getState();
-                await OBR.scene.items.updateItems(items, (items) =>
-                    items.forEach((item) => {
-                        if (!isToken(item)) {
-                            return;
-                        }
-                        const persistedToken = getPersistedToken(
-                            state,
-                            item.image.url,
-                        );
-                        if (!persistedToken) {
-                            return;
-                        }
-                        for (const [key, value] of Object.entries(
-                            persistedToken.metadata,
-                        )) {
-                            item.metadata[key] = value;
-                        }
-                    }),
-                );
+                if (
+                    !confirm("Overwrite this token with values from template?")
+                ) {
+                    return;
+                }
+
+                await applyPersisted(items.filter(isToken), true);
                 const plural = items.length > 1;
                 void OBR.player.deselect();
                 void OBR.notification.show(

@@ -15,6 +15,7 @@ import {
     Alert,
     Badge,
     Box,
+    Button,
     CardHeader,
     CardMedia,
     Divider,
@@ -32,6 +33,7 @@ import { Highlight, useFuzzySearchList } from "@nozbe/microfuzz/react";
 import type { ImageContent } from "@owlbear-rodeo/sdk";
 import OBR from "@owlbear-rodeo/sdk";
 import { filesize } from "filesize";
+import sizeof from "object-sizeof";
 import { Control, getId, useActionResizer, useRehydrate } from "owlbear-utils";
 import React, { useRef, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
@@ -76,7 +78,13 @@ function TokenCard({
             (item) => isToken(item) && item.image.url === url,
         );
         if (items.length > 0) {
-            await OBR.player.select(items.map(getId));
+            const bounds = await OBR.scene.items.getItemBounds(
+                items.map(getId),
+            );
+            await Promise.all([
+                OBR.player.select(items.map(getId)),
+                OBR.viewport.animateToBounds(bounds),
+            ]);
         }
     }
 
@@ -133,9 +141,7 @@ function TokenCard({
                                 token.name
                             )
                         }
-                        subheader={filesize(
-                            JSON.stringify(token.metadata).length,
-                        )}
+                        subheader={filesize(sizeof(token))}
                         slotProps={{
                             title: {
                                 variant: "body1",
@@ -329,6 +335,16 @@ export function Action() {
                             Right click a token to persist it.
                         </Typography>
                     </Stack>
+                )}
+
+                {import.meta.env.DEV && (
+                    <Button
+                        onClick={() =>
+                            console.log(usePlayerStorage.getState().tokens)
+                        }
+                    >
+                        Debug Tokens
+                    </Button>
                 )}
             </Stack>
         </Box>

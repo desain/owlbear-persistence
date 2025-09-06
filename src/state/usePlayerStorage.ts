@@ -1,18 +1,19 @@
 import {
-    type Image,
     type ImageContent,
     type Item,
     type Metadata,
     type Theme,
 } from "@owlbear-rodeo/sdk";
-import { enableMapSet } from "immer";
+import { enableMapSet, type WritableDraft } from "immer";
 import { WHITE_HEX, type ExtractNonFunctions, type Role } from "owlbear-utils";
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import { handleNewTokens } from "../action/applyPersisted";
+import { applyPersisted } from "../action/applyPersisted";
+import { processAttachments } from "../action/processAttachments";
 import { LOCAL_STORAGE_STORE_NAME } from "../constants";
 import { isToken, type Token } from "../Token";
+import { getAllAttachments, toItemMap, type ItemMap } from "./ItemMap";
 
 enableMapSet();
 
@@ -21,6 +22,7 @@ export interface PersistedToken {
     readonly imageUrl: string;
     readonly name: string;
     readonly metadata: Metadata;
+    readonly attachments?: Item[];
     readonly type: PersistenceType;
     readonly lastModified: number;
 }
@@ -34,7 +36,7 @@ interface LocalStorage {
     ) => void;
     readonly persist: (
         this: void,
-        tokens: { token: Token; type: PersistenceType }[],
+        tokens: { token: Token; type: PersistenceType; attachments?: Item[] }[],
     ) => void;
     readonly setType: (
         this: void,
@@ -69,10 +71,7 @@ interface OwlbearStore {
     readonly theme: Theme;
     // readonly playerId: string;
     // readonly grid: GridParsed;
-    /**
-     * Image -> last modified unix timestamp (used to track updates).
-     */
-    readonly tokensInScene: Map<Image["id"], number>;
+    readonly items: ItemMap;
     /**
      * URL to usage count.
      */
@@ -121,6 +120,36 @@ export function getPersistedToken<T extends LocalStorage>(
     return state.tokens.find((token) => token.imageUrl === url);
 }
 
+function* walkParents(items: Readonly<ItemMap>, item: Item) {
+    const visited = new Set<Item["id"]>();
+    let current: Item | undefined = item;
+    while (current) {
+        if (visited.has(current.id)) {
+            break;
+        }
+        yield current;
+        visited.add(current.id);
+        current = current.attachedTo
+            ? items.get(current.attachedTo)
+            : undefined;
+    }
+}
+
+function* walkParentPersistedUniqueTokens<S extends LocalStorage>(
+    state: S,
+    itemMap: ItemMap,
+    item: Item,
+): Generator<{ token: Token; persistedToken: S["tokens"][number] }> {
+    for (const current of walkParents(itemMap, item)) {
+        if (isToken(current)) {
+            const persistedToken = getPersistedToken(state, current.image.url);
+            if (persistedToken && persistedToken.type === "UNIQUE") {
+                yield { token: current, persistedToken };
+            }
+        }
+    }
+}
+
 export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
     subscribeWithSelector(
         persist(
@@ -132,7 +161,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     set({ contextMenuEnabled }),
                 persist: (tokens) =>
                     set((state) => {
-                        for (const { token, type } of tokens) {
+                        for (const { token, type, attachments } of tokens) {
                             // check if token is already persisted
                             const persistedToken = getPersistedToken(
                                 state,
@@ -150,6 +179,10 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                     token.lastModified,
                                 );
                                 persistedToken.metadata = token.metadata;
+                                persistedToken.attachments = processAttachments(
+                                    token,
+                                    attachments,
+                                );
                             } else if (!persistedToken) {
                                 // no existing token
                                 state.tokens.push({
@@ -160,6 +193,10 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                     metadata: token.metadata,
                                     name: token.text.plainText || token.name,
                                     type,
+                                    attachments: processAttachments(
+                                        token,
+                                        attachments,
+                                    ),
                                 });
                             }
                         }
@@ -191,7 +228,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 // owlbear store
                 sceneReady: false,
                 role: "PLAYER",
-                tokensInScene: new Map(),
+                items: new Map(),
                 urlUsage: new Map(),
                 theme: {
                     background: {
@@ -234,7 +271,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     set((state) => {
                         state.sceneReady = sceneReady;
                         if (!sceneReady) {
-                            state.tokensInScene.clear();
+                            state.items.clear();
                         }
                     }),
                 setRole: (role: Role) => set({ role }),
@@ -265,52 +302,127 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                         const tokens = items.filter(isToken);
 
                         state.urlUsage = getUrlUsage(tokens);
+                        const prevItems = state.items;
+                        state.items = toItemMap(items);
 
-                        const newTokens: Image[] = [];
-                        // Update persisted tokens
-                        for (const token of tokens) {
-                            const lastModified = Date.parse(token.lastModified);
-                            const prevLastModified = state.tokensInScene.get(
-                                token.id,
-                            );
-
-                            if (prevLastModified !== undefined) {
-                                // image already existed
-                                if (prevLastModified < lastModified) {
-                                    // image was updated
-                                    const persistedToken = getPersistedToken(
-                                        state,
-                                        token.image.url,
-                                    );
-                                    if (
-                                        persistedToken &&
-                                        persistedToken.type === "UNIQUE" &&
-                                        state.urlUsage.get(token.image.url) ===
-                                            1
-                                    ) {
-                                        persistedToken.lastModified =
-                                            lastModified;
-                                        persistedToken.metadata =
-                                            token.metadata;
-                                    }
-                                }
+                        const updatedUniqueTokens = new Map<
+                            Token["id"],
+                            {
+                                token: Token;
+                                lastModified: number;
+                                uniquePersistedToken: WritableDraft<PersistedToken>;
+                            }
+                        >();
+                        const addUpdatedUniqueToken = (
+                            token: Token,
+                            lastModified: number,
+                            uniquePersistedToken: WritableDraft<PersistedToken>,
+                        ) => {
+                            const existing = updatedUniqueTokens.get(token.id);
+                            if (existing) {
+                                existing.lastModified = Math.max(
+                                    existing.lastModified,
+                                    lastModified,
+                                );
                             } else {
-                                // image is new
-                                newTokens.push(token);
+                                updatedUniqueTokens.set(token.id, {
+                                    token,
+                                    lastModified,
+                                    uniquePersistedToken,
+                                });
+                            }
+                        };
+                        const newTokens: Token[] = [];
+
+                        // Update persisted tokens
+                        for (const item of items) {
+                            const lastModified = Date.parse(item.lastModified);
+
+                            // skip unmodified items
+                            const prevItem = prevItems.get(item.id);
+                            if (
+                                prevItem &&
+                                lastModified <=
+                                    Date.parse(prevItem.lastModified)
+                            ) {
+                                continue;
+                            }
+
+                            // record new tokens to update with metadata later
+                            if (!prevItem && isToken(item)) {
+                                newTokens.push(item);
+                            }
+
+                            // item is new or was updated. Find the unique tokens in chains it belongs to
+                            // and schedule those unique tokens to save
+                            for (const {
+                                token,
+                                persistedToken,
+                            } of walkParentPersistedUniqueTokens(
+                                state,
+                                state.items,
+                                item,
+                            )) {
+                                // Skip saving the new token since it hasn't gotten its metadata yet.
+                                if (!prevItem && token.id === item.id) {
+                                    continue;
+                                }
+
+                                addUpdatedUniqueToken(
+                                    token,
+                                    lastModified,
+                                    persistedToken,
+                                );
                             }
                         }
 
-                        // Save existing images for next time
-                        state.tokensInScene = new Map(
-                            tokens.map(({ id, lastModified }) => [
-                                id,
-                                Date.parse(lastModified),
-                            ]),
-                        );
+                        // Look for deleted attachments
+                        for (const item of prevItems.values()) {
+                            if (!state.items.has(item.id)) {
+                                // item was deleted
+                                for (const {
+                                    token,
+                                    persistedToken,
+                                } of walkParentPersistedUniqueTokens(
+                                    state,
+                                    state.items,
+                                    item,
+                                )) {
+                                    // does the parent still exist? if so, mark it for updating.
+                                    addUpdatedUniqueToken(
+                                        token,
+                                        Date.now(),
+                                        persistedToken,
+                                    );
+                                }
+                            }
+                        }
+
+                        // Update unique tokens
+                        for (const {
+                            token,
+                            lastModified,
+                            uniquePersistedToken,
+                        } of updatedUniqueTokens.values()) {
+                            if (state.urlUsage.get(token.image.url) === 1) {
+                                uniquePersistedToken.lastModified =
+                                    lastModified;
+                                uniquePersistedToken.metadata = token.metadata;
+                                uniquePersistedToken.attachments =
+                                    processAttachments(
+                                        token,
+                                        getAllAttachments(state.items, token),
+                                    );
+                            } else {
+                                console.warn(
+                                    `skipping updating unique token ${uniquePersistedToken.name} due to too many identical tokens`,
+                                );
+                            }
+                        }
 
                         // Populate new tokens from persisted data
                         if (state.role === "GM") {
-                            void handleNewTokens(newTokens);
+                            void applyPersisted(newTokens);
                         }
                     }),
                 // handleRoomMetadataChange: (metadata) => {

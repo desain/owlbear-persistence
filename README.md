@@ -48,7 +48,8 @@ To make a production build run:
 
 ## To do
 
--   Include attachments
+-   Immediate sync after deleting a scene token so a persisted token is no longer overused
+-   "original URL" metadata key
 
 ## License
 

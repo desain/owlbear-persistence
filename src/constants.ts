@@ -1,6 +1,8 @@
 const PLUGIN_ID = "com.desain.persistence";
 export const EXTENSION_NAME = "Persistent Tokens";
 
+export const ATTACHED_TO_ROOT = "ROOT";
+
 // Broadcasts
 export const CHANNEL_MESSAGE = `${PLUGIN_ID}/message`;
 

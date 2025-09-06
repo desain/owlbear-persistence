@@ -1,5 +1,5 @@
 import OBR from "@owlbear-rodeo/sdk";
-import { deferCallAll } from "owlbear-utils";
+import { deferCallAll, DO_NOTHING } from "owlbear-utils";
 import { version } from "../package.json";
 import { installActionIconWatcher } from "./action/actionIconWatcher";
 import { installBroadcastListener } from "./broadcast/broadcast";
@@ -11,9 +11,7 @@ export function install() {
         console.log(`${EXTENSION_NAME} version ${version}`);
 
         if ((await OBR.player.getRole()) !== "GM") {
-            return () => {
-                // player instance has no cleanup
-            };
+            return DO_NOTHING;
         }
 
         const stopWatchingContextMenu = await startWatchingContextMenuEnabled();
