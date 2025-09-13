@@ -34,8 +34,14 @@ import type { ImageContent } from "@owlbear-rodeo/sdk";
 import OBR from "@owlbear-rodeo/sdk";
 import { filesize } from "filesize";
 import sizeof from "object-sizeof";
-import { Control, getId, useActionResizer, useRehydrate } from "owlbear-utils";
-import React, { useRef, useState } from "react";
+import {
+    Control,
+    getId,
+    sum,
+    useActionResizer,
+    useRehydrate,
+} from "owlbear-utils";
+import { useMemo, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
 import { openSettings } from "../popoverSettings/openSettings";
 import {
@@ -59,11 +65,13 @@ function formatTimestamp(ts?: number) {
 
 function TokenCard({
     token,
+    size,
     expanded,
     setExpanded,
     highlightRanges,
 }: {
     token: PersistedToken;
+    size: number;
     expanded: boolean;
     setExpanded: (expanded: string | null) => void;
     highlightRanges?: Range[];
@@ -141,7 +149,7 @@ function TokenCard({
                                 token.name
                             )
                         }
-                        subheader={filesize(sizeof(token))}
+                        subheader={filesize(size)}
                         slotProps={{
                             title: {
                                 variant: "body1",
@@ -238,22 +246,22 @@ function TokenCard({
 }
 
 export function Action() {
-    const box: React.RefObject<HTMLElement | null> = useRef(null);
-
     const [expanded, setExpanded] = useState<string | null>();
     const [query, setQuery] = useState("");
 
     const BASE_HEIGHT = 50;
     const MAX_HEIGHT = 700;
-    useActionResizer(BASE_HEIGHT, MAX_HEIGHT, box);
+    const box = useActionResizer(BASE_HEIGHT, MAX_HEIGHT);
     useRehydrate(usePlayerStorage);
 
     const role = usePlayerStorage((s) => s.role);
-    const tokens = usePlayerStorage((store) => store.tokens);
+    const tokens = usePlayerStorage((s) => s.tokens);
+    const sizes = useMemo(
+        () => new Map(tokens.map((t) => [t.imageUrl, sizeof(t)])),
+        [tokens],
+    );
+    const totalSize = sum(sizes.values());
 
-    // we use microfuzz's Highlight component to render matched ranges
-
-    // use microfuzz React hook for fuzzy searching tokensSorted by name
     const filtered = useFuzzySearchList<
         PersistedToken,
         { token: PersistedToken; highlightRanges?: Range[] }
@@ -276,6 +284,7 @@ export function Action() {
         <Box ref={box}>
             <CardHeader
                 title={EXTENSION_NAME}
+                subheader={`${filesize(totalSize)} / 5MB used`}
                 slotProps={{
                     title: {
                         sx: {
@@ -328,6 +337,7 @@ export function Action() {
                                 expanded={expanded === token.imageUrl}
                                 setExpanded={setExpanded}
                                 token={token}
+                                size={sizes.get(token.imageUrl) ?? 0}
                                 highlightRanges={highlightRanges}
                             />
                         ))}

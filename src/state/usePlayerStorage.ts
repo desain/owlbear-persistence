@@ -5,7 +5,15 @@ import {
     type Theme,
 } from "@owlbear-rodeo/sdk";
 import { enableMapSet, type WritableDraft } from "immer";
-import { getAllAttachments, toItemMap, WHITE_HEX, type ExtractNonFunctions, type ItemMap, type Role } from "owlbear-utils";
+import {
+    DEFAULT_GRID,
+    DEFAULT_THEME,
+    getAllAttachments,
+    toItemMap,
+    type ExtractNonFunctions,
+    type ItemMap,
+    type Role,
+} from "owlbear-utils";
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
@@ -229,42 +237,9 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                 role: "PLAYER",
                 items: new Map(),
                 urlUsage: new Map(),
-                theme: {
-                    background: {
-                        default: WHITE_HEX,
-                        paper: WHITE_HEX,
-                    },
-                    text: {
-                        primary: WHITE_HEX,
-                        secondary: WHITE_HEX,
-                        disabled: WHITE_HEX,
-                        hint: WHITE_HEX,
-                    },
-                    mode: "DARK",
-                    primary: {
-                        contrastText: WHITE_HEX,
-                        dark: WHITE_HEX,
-                        light: WHITE_HEX,
-                        main: WHITE_HEX,
-                    },
-                    secondary: {
-                        contrastText: WHITE_HEX,
-                        dark: WHITE_HEX,
-                        light: WHITE_HEX,
-                        main: WHITE_HEX,
-                    },
-                },
+                theme: DEFAULT_THEME,
                 // playerId: "NONE",
-                // grid: {
-                //     dpi: -1,
-                //     measurement: "CHEBYSHEV",
-                //     type: "SQUARE",
-                //     parsedScale: {
-                //         digits: 1,
-                //         unit: "ft",
-                //         multiplier: 5,
-                //     },
-                // },
+                grid: DEFAULT_GRID,
                 // roomMetadata: { _key: true },
                 setSceneReady: (sceneReady: boolean) =>
                     set((state) => {
