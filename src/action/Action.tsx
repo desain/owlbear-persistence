@@ -87,6 +87,10 @@ function TokenCard({
     const urlUsage = usePlayerStorage((s) => s.urlUsage);
 
     async function handleSelect(url: ImageContent["url"]) {
+        if (!usePlayerStorage.getState().sceneReady) {
+            // can't focus a token if the scene is gone
+            return;
+        }
         const items = await OBR.scene.items.getItems(
             (item) => isToken(item) && item.image.url === url,
         );

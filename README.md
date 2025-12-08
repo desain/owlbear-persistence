@@ -53,10 +53,9 @@ To make a production build run:
 -   Detect 'update too large' and split updating multiple items per update into multiple updates
 -   Settings
     -   Persist to (locked to local storage)
--   Don't try to focus viewport if scene is gone
 -   Don't apply unique persisted if there's already a unique token of the same url in the scene
--   Immediate sync after deleting a scene token so a persisted token is no longer overused
--   "original URL" metadata key
+-   Immediate sync after user deletes a scene token such that a persisted token is no longer overused
+-   "original URL" metadata key as ID
 -   Apply persisted tokens on rehydrate storage event? For "multi room in different scenes using the same token" cases.
 
 ## License
