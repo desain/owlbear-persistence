@@ -40,18 +40,20 @@ export async function applyPersisted(tokens: Token[], overwrite?: boolean) {
             updates.set(token.id, persistedToken);
 
             // We want to replace attachments if:
-            // - we're in overwrite mode
-            // - the token has no attachments yet
-            //      (in which case nothing will be replaced, just maybe added)
-            // - it's a unique token and we have a more recent value
+            // - the token doesn't want to drop attachments, AND one of the following:
+            //   - we're in overwrite mode
+            //   - the token has no attachments yet
+            //        (in which case nothing will be replaced, just maybe added)
+            //   - it's a unique token and we have a more recent value
             const existingAttachments = (
                 await OBR.scene.items.getItemAttachments([token.id])
             ).filter((a) => a.id !== token.id);
 
             if (
-                overwrite ||
-                existingAttachments.length === 0 ||
-                isNewerUniqueToken(token, persistedToken)
+                (persistedToken.restoreAttachments ?? true) &&
+                (overwrite ||
+                    existingAttachments.length === 0 ||
+                    isNewerUniqueToken(token, persistedToken))
             ) {
                 oldAttachmentsToDelete.push(...existingAttachments.map(getId));
                 newAttachmentsToAdd.push(
@@ -74,7 +76,7 @@ export async function applyPersisted(tokens: Token[], overwrite?: boolean) {
                 for (const [key, value] of Object.entries(
                     persistedToken.metadata,
                 )) {
-                    // We can write the metadata key if:
+                    // We can write the metadata key if one of the following is true:
                     // - we're in overwrite mode
                     // - it doesn't exist yet
                     // - it's a unique token and we have a more recent value

@@ -30,6 +30,12 @@ export interface PersistedToken {
     readonly name: string;
     readonly metadata: Metadata;
     readonly attachments?: Item[];
+    /**
+     * Whether to restore the token's attachments when restoring it.
+     * Optional for backwards compatibility. If not present, read
+     * as true.
+     */
+    readonly restoreAttachments?: boolean;
     readonly type: PersistenceType;
     readonly lastModified: number;
 }
@@ -54,6 +60,11 @@ interface LocalStorage {
         this: void,
         url: ImageContent["url"],
         name: string,
+    ) => void;
+    readonly setTokenRestoreAttachments: (
+        this: void,
+        url: ImageContent["url"],
+        restoreAttachments: boolean,
     ) => void;
     readonly removeToken: (this: void, url: ImageContent["url"]) => void;
 }
@@ -221,6 +232,13 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                         const token = getPersistedToken(state, url);
                         if (token) {
                             token.name = name;
+                        }
+                    }),
+                setTokenRestoreAttachments: (url, restoreAttachments) =>
+                    set((state) => {
+                        const token = getPersistedToken(state, url);
+                        if (token) {
+                            token.restoreAttachments = restoreAttachments;
                         }
                     }),
                 removeToken: (url) =>

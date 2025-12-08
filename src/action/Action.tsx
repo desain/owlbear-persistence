@@ -23,6 +23,7 @@ import {
     InputAdornment,
     Paper,
     Stack,
+    Switch,
     TextField,
     ToggleButton,
     ToggleButtonGroup,
@@ -79,6 +80,9 @@ function TokenCard({
 }) {
     const setType = usePlayerStorage((s) => s.setType);
     const setName = usePlayerStorage((s) => s.setTokenName);
+    const setRestoreAttachments = usePlayerStorage(
+        (s) => s.setTokenRestoreAttachments,
+    );
     const removeToken = usePlayerStorage((s) => s.removeToken);
     const urlUsage = usePlayerStorage((s) => s.urlUsage);
 
@@ -235,6 +239,23 @@ function TokenCard({
                             >
                                 <DeleteOutline fontSize="small" />
                             </IconButton>
+                        </Control>
+                    </Stack>
+                    <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                    >
+                        <Control label="Save attachments?">
+                            <Switch
+                                checked={token.restoreAttachments}
+                                onChange={(_e, checked) =>
+                                    setRestoreAttachments(
+                                        token.imageUrl,
+                                        checked,
+                                    )
+                                }
+                            />
                         </Control>
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
