@@ -21,6 +21,7 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    Paper,
     Stack,
     TextField,
     ToggleButton,
@@ -43,13 +44,13 @@ import {
 } from "owlbear-utils";
 import { useMemo, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
-import { openSettings } from "../popoverSettings/openSettings";
 import {
     usePlayerStorage,
     type PersistedToken,
     type PersistenceType,
 } from "../state/usePlayerStorage";
 import { isToken } from "../Token";
+import { Settings as SettingsPanel } from "./Settings";
 
 function formatTimestamp(ts?: number) {
     if (!ts) {
@@ -246,6 +247,7 @@ function TokenCard({
 }
 
 export function Action() {
+    const [showSettings, setShowSettings] = useState(false);
     const [expanded, setExpanded] = useState<string | null>();
     const [query, setQuery] = useState("");
 
@@ -296,7 +298,7 @@ export function Action() {
                     },
                 }}
                 action={
-                    <IconButton onClick={openSettings}>
+                    <IconButton onClick={() => setShowSettings(true)}>
                         <Settings />
                     </IconButton>
                 }
@@ -357,6 +359,23 @@ export function Action() {
                     </Button>
                 )}
             </Stack>
+            <Box
+                sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    transition: "transform 0.2s ease-in-out",
+                    transform: showSettings
+                        ? "translateX(0)"
+                        : "translateX(-100%)",
+                }}
+            >
+                <Paper elevation={2} sx={{ height: "100%" }}>
+                    <SettingsPanel onBack={() => setShowSettings(false)} />
+                </Paper>
+            </Box>
         </Box>
     );
 }

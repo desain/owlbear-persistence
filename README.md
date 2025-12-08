@@ -48,6 +48,13 @@ To make a production build run:
 
 ## To do
 
+-   Test gmg
+-   'In Party' setting for tokens, and ability to right click map to insert all party members
+-   Check attachment size when restoring tokens
+-   Detect 'update too large' and split updating multiple items per update into multiple updates
+-   Settings
+    -   Deal with attachments?
+    -   Persist to (locked to local storage)
 -   Don't try to focus viewport if scene is gone
 -   Don't apply unique persisted if there's already a unique token of the same url in the scene
 -   Immediate sync after deleting a scene token so a persisted token is no longer overused

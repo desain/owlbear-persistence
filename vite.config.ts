@@ -18,10 +18,6 @@ export default defineConfig({
             input: {
                 // must have a 'main' entry point
                 action: resolve(__dirname, "/src/action/action.html"),
-                popoverSettings: resolve(
-                    __dirname,
-                    "/src/popoverSettings/popoverSettings.html",
-                ),
             },
         },
     },

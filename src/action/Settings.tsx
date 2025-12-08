@@ -1,9 +1,23 @@
-import { Box, FormControlLabel, Switch, Typography } from "@mui/material";
+import ArrowBack from "@mui/icons-material/ArrowBack";
+import {
+    Box,
+    CardHeader,
+    FormControlLabel,
+    IconButton,
+    Switch,
+    Tooltip,
+    Typography,
+} from "@mui/material";
+import type React from "react";
 import { version } from "../../package.json";
 import { EXTENSION_NAME } from "../constants";
 import { usePlayerStorage } from "../state/usePlayerStorage";
 
-export function Settings() {
+interface SettingsProps {
+    onBack: VoidFunction;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const contextMenuEnabled = usePlayerStorage(
         (store) => store.contextMenuEnabled,
     );
@@ -12,9 +26,26 @@ export function Settings() {
     );
     return (
         <Box sx={{ p: 2, minWidth: 300 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-                {EXTENSION_NAME} Settings
-            </Typography>
+            <CardHeader
+                title={"Settings"}
+                slotProps={{
+                    title: {
+                        sx: {
+                            fontSize: "1.125rem",
+                            fontWeight: "bold",
+                            lineHeight: "32px",
+                            color: "text.primary",
+                        },
+                    },
+                }}
+                action={
+                    <Tooltip title="Back">
+                        <IconButton onClick={onBack}>
+                            <ArrowBack />
+                        </IconButton>
+                    </Tooltip>
+                }
+            />
             <FormControlLabel
                 control={
                     <Switch
@@ -36,4 +67,4 @@ export function Settings() {
             </Typography>
         </Box>
     );
-}
+};

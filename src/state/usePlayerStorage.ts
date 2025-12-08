@@ -57,6 +57,7 @@ interface LocalStorage {
     ) => void;
     readonly removeToken: (this: void, url: ImageContent["url"]) => void;
 }
+
 function partializeLocalStorage({
     contextMenuEnabled,
     tokens,
@@ -250,18 +251,6 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     }),
                 setRole: (role: Role) => set({ role }),
                 // setPlayerId: (playerId: string) => set({ playerId }),
-                // setGrid: async (grid: GridParams) => {
-                //     const parsedScale = (await OBR.scene.grid.getScale())
-                //         .parsed;
-                //     return set({
-                //         grid: {
-                //             dpi: grid.dpi,
-                //             measurement: grid.measurement,
-                //             type: grid.type,
-                //             parsedScale,
-                //         },
-                //     });
-                // },
                 // setSelection: async (selection: string[] | undefined) => {
                 //     if (selection && selection.length > 0) {
                 //         return set({
