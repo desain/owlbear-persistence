@@ -48,6 +48,8 @@ To make a production build run:
 
 ## To do
 
+-   Save and load json
+-   Some way for template tokens to work even if the GM isn't in the scene?
 -   Test gmg
 -   'In Party' setting for tokens, and ability to right click map to insert all party members
 -   Detect 'update too large' and split updating multiple items per update into multiple updates
