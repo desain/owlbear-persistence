@@ -1,10 +1,13 @@
 import {
+    Close,
     DeleteOutline,
+    Download,
     ExpandMore,
     Group,
     Person,
     Search,
     Settings,
+    Upload,
     Warning,
 } from "@mui/icons-material";
 import Edit from "@mui/icons-material/Edit";
@@ -37,15 +40,17 @@ import OBR from "@owlbear-rodeo/sdk";
 import { filesize } from "filesize";
 import sizeof from "object-sizeof";
 import {
+    complain,
     Control,
     getId,
     sum,
     useActionResizer,
     useRehydrate,
 } from "owlbear-utils";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
 import {
+    isPersistedTokenArray,
     persistedTokenGetLastModified,
     persistedTokenGetName,
     persistedTokenKey,
@@ -233,7 +238,7 @@ function TokenCard({
                                 size="small"
                                 onClick={() => {
                                     const ok = window.confirm(
-                                        `Remove token "${name}"?`,
+                                        `Stop persisting token "${name}"?`,
                                     );
                                     if (ok) {
                                         removeToken(key);
@@ -252,7 +257,7 @@ function TokenCard({
                     >
                         <Control label="Save attachments?">
                             <Switch
-                                checked={token.restoreAttachments}
+                                checked={token.restoreAttachments ?? true}
                                 onChange={(_e, checked) =>
                                     setRestoreAttachments(key, checked)
                                 }
@@ -273,6 +278,8 @@ export function Action() {
     const [showSettings, setShowSettings] = useState(false);
     const [expanded, setExpanded] = useState<string | null>();
     const [query, setQuery] = useState("");
+    const [searchExpanded, setSearchExpanded] = useState(false);
+    const uploadRef = useRef<HTMLInputElement>(null);
 
     const BASE_HEIGHT = 50;
     const MAX_HEIGHT = 700;
@@ -281,6 +288,7 @@ export function Action() {
 
     const role = usePlayerStorage((s) => s.role);
     const tokens = usePlayerStorage((s) => s.tokens);
+    const importTokens = usePlayerStorage((s) => s.importTokens);
     const sizes = useMemo(
         () => new Map(tokens.map((t) => [persistedTokenKey(t), sizeof(t)])),
         [tokens],
@@ -300,6 +308,62 @@ export function Action() {
         }),
         strategy: "smart",
     });
+
+    const handleDownload = () => {
+        const blob = new Blob([JSON.stringify(tokens, null, 2)], {
+            type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "owlbear-persisted-tokens.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result;
+            if (typeof text === "string") {
+                try {
+                    const importedTokens: unknown = JSON.parse(text);
+                    if (!isPersistedTokenArray(importedTokens)) {
+                        throw Error(
+                            "Invalid JSON file; must contain persisted token list.",
+                        );
+                    }
+                    const currentTokens = usePlayerStorage.getState().tokens;
+                    const currentKeys = new Set(
+                        currentTokens.map(persistedTokenKey),
+                    );
+                    const collision = importedTokens.some((t) =>
+                        currentKeys.has(persistedTokenKey(t)),
+                    );
+
+                    if (collision) {
+                        if (
+                            !window.confirm(
+                                "Some tokens will be replaced. Continue?",
+                            )
+                        ) {
+                            return;
+                        }
+                    }
+                    importTokens(importedTokens);
+                } catch (e) {
+                    complain(e);
+                }
+            }
+        };
+        reader.readAsText(file);
+        // reset input
+        event.target.value = "";
+    };
 
     return role === "PLAYER" ? (
         <Alert severity="warning">
@@ -329,22 +393,67 @@ export function Action() {
             <Divider sx={{ mb: 1 }} />
 
             <Stack spacing={1} sx={{ p: 0 }}>
-                <TextField
-                    size="small"
-                    placeholder="Search tokens"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search fontSize="small" />
-                                </InputAdornment>
-                            ),
-                        },
-                    }}
-                    sx={{ mb: 1 }}
-                />
+                <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{ mb: 1, minHeight: 40 }}
+                >
+                    {searchExpanded ? (
+                        <TextField
+                            fullWidth
+                            autoFocus
+                            size="small"
+                            placeholder="Search tokens"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            slotProps={{
+                                input: {
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search fontSize="small" />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                    setSearchExpanded(false);
+                                                    setQuery("");
+                                                }}
+                                            >
+                                                <Close fontSize="small" />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                },
+                            }}
+                        />
+                    ) : (
+                        <>
+                            <IconButton onClick={() => setSearchExpanded(true)}>
+                                <Search />
+                            </IconButton>
+                            <Box sx={{ flexGrow: 1 }} />
+                            <IconButton onClick={handleDownload}>
+                                <Download />
+                            </IconButton>
+                            <IconButton
+                                onClick={() => uploadRef.current?.click()}
+                            >
+                                <Upload />
+                            </IconButton>
+                            <input
+                                type="file"
+                                accept=".json"
+                                ref={uploadRef}
+                                style={{ display: "none" }}
+                                onChange={handleUpload}
+                            />
+                        </>
+                    )}
+                </Stack>
 
                 {tokens.length === 0 ? (
                     <Typography color="text.secondary">

@@ -1,6 +1,13 @@
 import type { Item, Metadata } from "@owlbear-rodeo/sdk";
 import type { WritableDraft } from "immer";
-import { tokenKey, type Token } from "../Token";
+import {
+    containsImplies,
+    isBoolean,
+    isItem,
+    isObject,
+    isString,
+} from "owlbear-utils";
+import { isToken, tokenKey, type Token } from "../Token";
 import { processAttachments } from "../action/processAttachments";
 
 interface PersistedTokenBase {
@@ -11,6 +18,10 @@ interface PersistedTokenBase {
      * as true.
      */
     readonly restoreAttachments?: boolean;
+    /**
+     * Which groups the token is in. Read undefined as no groups.
+     */
+    readonly groups?: string[];
     readonly type: PersistenceType;
 }
 
@@ -27,8 +38,47 @@ interface PersistDataV2 {
 
 export type PersistenceType = "TEMPLATE" | "UNIQUE";
 
+export function isPersistenceType(t: unknown): t is PersistenceType {
+    return t === "TEMPLATE" || t === "UNIQUE";
+}
+
 export type PersistedToken = PersistedTokenBase &
     (PersistDataV1 | PersistDataV2);
+
+export function isPersistedToken(t: unknown): t is PersistedToken {
+    const hasBase =
+        isObject(t) &&
+        containsImplies(
+            t,
+            "attachments",
+            (a) => Array.isArray(a) && a.every(isItem),
+        ) &&
+        containsImplies(t, "restoreAttachments", isBoolean) &&
+        containsImplies(
+            t,
+            "groups",
+            (g) => Array.isArray(g) && g.every(isString),
+        ) &&
+        "type" in t &&
+        isPersistenceType(t.type);
+    const hasPersistDataV1 =
+        hasBase &&
+        "name" in t &&
+        typeof t.name === "string" &&
+        "metadata" in t &&
+        isObject(t.metadata) &&
+        "lastModified" in t &&
+        typeof t.lastModified === "number" &&
+        "imageUrl" in t &&
+        typeof t.imageUrl === "string";
+    const hasPersistDataV2 =
+        hasBase && "token" in t && isItem(t.token) && isToken(t.token);
+    return hasPersistDataV1 || hasPersistDataV2;
+}
+
+export function isPersistedTokenArray(a: unknown): a is PersistedToken[] {
+    return Array.isArray(a) && a.every(isPersistedToken);
+}
 
 export function persistedTokenFull(
     persistedToken: PersistedToken,
@@ -43,16 +93,17 @@ export function persistedTokenKey(persistedToken: PersistedToken) {
 }
 
 export function persistedTokenUpdate(
-    { restoreAttachments, type }: Readonly<PersistedToken>,
+    { restoreAttachments, type, groups }: Readonly<PersistedToken>,
     token: Token,
     lastModified: string,
     attachments?: Item[],
 ): PersistedToken {
     return {
-        attachments: processAttachments(token, attachments),
-        restoreAttachments,
         type,
+        groups,
+        restoreAttachments,
         token: { ...token, lastModified },
+        attachments: processAttachments(token, attachments),
     };
 }
 

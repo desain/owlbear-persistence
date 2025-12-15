@@ -62,6 +62,7 @@ interface LocalStorage {
         restoreAttachments: boolean,
     ) => void;
     readonly removeToken: (this: void, key: ImageContent["url"]) => void;
+    readonly importTokens: (this: void, tokens: PersistedToken[]) => void;
 }
 
 function partializeLocalStorage({
@@ -270,6 +271,20 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                         );
                         if (persistedTokenIdx > -1) {
                             state.tokens.splice(persistedTokenIdx, 1);
+                        }
+                    }),
+                importTokens: (tokens) =>
+                    set((state) => {
+                        for (const token of tokens) {
+                            const { persistedTokenIdx } = getPersistedToken(
+                                state,
+                                persistedTokenKey(token),
+                            );
+                            if (persistedTokenIdx > -1) {
+                                state.tokens[persistedTokenIdx] = token;
+                            } else {
+                                state.tokens.push(token);
+                            }
                         }
                     }),
 

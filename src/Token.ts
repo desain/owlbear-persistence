@@ -4,7 +4,7 @@ import {
     type Item,
     type Metadata,
 } from "@owlbear-rodeo/sdk";
-import type { HasParameterizedMetadata } from "owlbear-utils";
+import { type HasParameterizedMetadata } from "owlbear-utils";
 import { METADATA_KEY_PERSISTED } from "./constants";
 
 export type Token = Image &
