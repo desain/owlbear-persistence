@@ -3,8 +3,13 @@ import HelpOutline from "@mui/icons-material/HelpOutline";
 import {
     Box,
     CardHeader,
+    FormControl,
     FormControlLabel,
     IconButton,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
     Switch,
     Tooltip,
     Typography,
@@ -61,18 +66,26 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     </Tooltip>
                 }
             />
-            <FormControlLabel
-                control={
-                    <Switch
-                        checked={contextMenuEnabled}
-                        onChange={(e) =>
-                            setContextMenuEnabled(e.target.checked)
-                        }
-                    />
-                }
-                label="Enable Context Menu"
-                sx={{ mb: 2 }}
-            />
+            <Stack>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={contextMenuEnabled}
+                            onChange={(e) =>
+                                setContextMenuEnabled(e.target.checked)
+                            }
+                        />
+                    }
+                    label="Enable Context Menu"
+                    sx={{ mb: 2 }}
+                />
+                <FormControl>
+                    <InputLabel>Persist to</InputLabel>
+                    <Select label="Persist to" disabled value="local">
+                        <MenuItem value="local">Local Browser Storage</MenuItem>
+                    </Select>
+                </FormControl>
+            </Stack>
             <Typography
                 color="textSecondary"
                 variant="subtitle1"
