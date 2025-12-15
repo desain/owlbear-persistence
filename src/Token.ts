@@ -22,3 +22,7 @@ export function isToken(item: Item): item is Token {
                 persistedKeys.every((s) => typeof s === "string")))
     );
 }
+
+export function tokenKey(token: Token) {
+    return token.image.url;
+}

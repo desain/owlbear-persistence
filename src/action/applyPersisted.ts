@@ -2,17 +2,28 @@ import type { Image, Item } from "@owlbear-rodeo/sdk";
 import OBR from "@owlbear-rodeo/sdk";
 import { getId } from "owlbear-utils";
 import {
-    getPersistedToken,
-    usePlayerStorage,
+    dateLte,
+    persistedTokenGetLastModified,
+    persistedTokenGetMetadata,
     type PersistedToken,
-} from "../state/usePlayerStorage";
+} from "../state/PersistedToken";
+import { getPersistedToken, usePlayerStorage } from "../state/usePlayerStorage";
 import { isToken, type Token } from "../Token";
 import { restoreAttachments } from "./processAttachments";
 
+/**
+ * @param token Map token
+ * @param persistedToken Persisted token
+ * @returns Whether the persisted token is supposed to be unique and is newer than
+ *          the token on the map.
+ */
 function isNewerUniqueToken(token: Token, persistedToken: PersistedToken) {
     return (
         persistedToken.type === "UNIQUE" &&
-        Date.parse(token.lastModified) < persistedToken.lastModified
+        !dateLte(
+            persistedTokenGetLastModified(persistedToken),
+            token.lastModified,
+        )
     );
 }
 
@@ -74,7 +85,7 @@ export async function applyPersisted(tokens: Token[], overwrite?: boolean) {
                 }
 
                 for (const [key, value] of Object.entries(
-                    persistedToken.metadata,
+                    persistedTokenGetMetadata(persistedToken),
                 )) {
                     // We can write the metadata key if one of the following is true:
                     // - we're in overwrite mode

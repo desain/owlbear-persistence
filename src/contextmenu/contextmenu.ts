@@ -14,9 +14,10 @@ import {
     ID_CONTEXTMENU_SAVE_TEMPLATE,
 } from "../constants";
 import {
-    usePlayerStorage,
+    persistedTokenKey,
     type PersistedToken,
-} from "../state/usePlayerStorage";
+} from "../state/PersistedToken";
+import { usePlayerStorage } from "../state/usePlayerStorage";
 import { isToken } from "../Token";
 
 export async function startWatchingContextMenuEnabled(): Promise<VoidFunction> {
@@ -65,10 +66,10 @@ function installPersistContextMenu(tokens: PersistedToken[]) {
                             operator: "!=",
                             value: "MAP" satisfies Layer,
                         },
-                        ...tokens.map((token) => ({
+                        ...tokens.map((pt) => ({
                             key: ["image", "url"],
                             operator: "!=" as const,
-                            value: token.imageUrl,
+                            value: persistedTokenKey(pt),
                         })),
                     ],
                 },
@@ -122,9 +123,9 @@ function installTemplateContextMenus(tokens: PersistedToken[]) {
         permissions: ["CREATE", "UPDATE"],
         roles: ["GM"],
         every: [
-            ...templates.map((token) => ({
+            ...templates.map((pt) => ({
                 key: ["image", "url"],
-                value: token.imageUrl,
+                value: persistedTokenKey(pt),
                 coordinator: "||" as const,
             })),
         ],

@@ -52,7 +52,6 @@ To make a production build run:
 -   Some way for template tokens to work even if the GM isn't in the scene?
 -   Test gmg
 -   'In Party' setting for tokens, and ability to right click map to insert all party members
--   Detect 'update too large' and split updating multiple items per update into multiple updates
 -   Don't apply unique persisted if there's already a unique token of the same url in the scene
 -   Immediate sync after user deletes a scene token such that a persisted token is no longer overused
 -   "original URL" metadata key as ID?

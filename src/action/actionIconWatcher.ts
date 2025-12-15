@@ -1,11 +1,12 @@
 import OBR from "@owlbear-rodeo/sdk";
+import { persistedTokenKey } from "../state/PersistedToken";
 import { usePlayerStorage } from "../state/usePlayerStorage";
 
 function anyTokenOverused(state: ReturnType<typeof usePlayerStorage.getState>) {
     return state.tokens.some(
-        (token) =>
-            token.type === "UNIQUE" &&
-            (state.urlUsage.get(token.imageUrl) ?? 0) > 1,
+        (pt) =>
+            pt.type === "UNIQUE" &&
+            (state.keyUsage.get(persistedTokenKey(pt)) ?? 0) > 1,
     );
 }
 

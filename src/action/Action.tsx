@@ -46,20 +46,22 @@ import {
 import { useMemo, useState } from "react";
 import { EXTENSION_NAME } from "../constants";
 import {
-    usePlayerStorage,
+    persistedTokenGetLastModified,
+    persistedTokenGetName,
+    persistedTokenKey,
     type PersistedToken,
     type PersistenceType,
-} from "../state/usePlayerStorage";
+} from "../state/PersistedToken";
+import { usePlayerStorage } from "../state/usePlayerStorage";
 import { isToken } from "../Token";
 import { Settings as SettingsPanel } from "./Settings";
 
-function formatTimestamp(ts?: number) {
+function formatTimestamp(ts?: Date) {
     if (!ts) {
         return "";
     }
     try {
-        const d = new Date(ts);
-        return d.toLocaleString();
+        return ts.toLocaleString();
     } catch {
         return String(ts);
     }
@@ -84,7 +86,10 @@ function TokenCard({
         (s) => s.setTokenRestoreAttachments,
     );
     const removeToken = usePlayerStorage((s) => s.removeToken);
-    const urlUsage = usePlayerStorage((s) => s.urlUsage);
+    const keyUsage = usePlayerStorage((s) => s.keyUsage);
+
+    const key = persistedTokenKey(token);
+    const name = persistedTokenGetName(token);
 
     async function handleSelect(url: ImageContent["url"]) {
         if (!usePlayerStorage.getState().sceneReady) {
@@ -108,28 +113,25 @@ function TokenCard({
     const image = (
         <CardMedia
             component="img"
-            image={token.imageUrl}
-            alt={token.name}
+            image={key}
+            alt={name}
             sx={{
                 width: 48,
                 height: 48,
             }}
             onClick={(e) => {
                 e.stopPropagation();
-                return handleSelect(token.imageUrl);
+                return handleSelect(key);
             }}
         />
     );
 
-    const hasWarning =
-        token.type === "UNIQUE" && (urlUsage.get(token.imageUrl) ?? 0) > 1;
+    const hasWarning = token.type === "UNIQUE" && (keyUsage.get(key) ?? 0) > 1;
 
     return (
         <Accordion
             expanded={expanded}
-            onChange={(_, isExpanded) =>
-                setExpanded(isExpanded ? token.imageUrl : null)
-            }
+            onChange={(_, isExpanded) => setExpanded(isExpanded ? key : null)}
         >
             <AccordionSummary
                 expandIcon={<ExpandMore />}
@@ -151,11 +153,11 @@ function TokenCard({
                         title={
                             highlightRanges ? (
                                 <Highlight
-                                    text={token.name}
+                                    text={name}
                                     ranges={highlightRanges}
                                 />
                             ) : (
-                                token.name
+                                name
                             )
                         }
                         subheader={filesize(size)}
@@ -188,21 +190,22 @@ function TokenCard({
                                 size="small"
                                 exclusive
                                 value={token.type}
-                                onChange={(_, value) => {
+                                onChange={(_, value: PersistenceType) => {
                                     if (value) {
-                                        setType(
-                                            token.imageUrl,
-                                            value as PersistenceType,
-                                        );
+                                        setType(key, value);
                                     }
                                 }}
                             >
-                                <ToggleButton value="UNIQUE">
+                                <ToggleButton
+                                    value={"UNIQUE" satisfies PersistenceType}
+                                >
                                     <Tooltip title="Unique token (updates to the token are saved immediately)">
                                         <Person fontSize="small" />
                                     </Tooltip>
                                 </ToggleButton>
-                                <ToggleButton value="TEMPLATE">
+                                <ToggleButton
+                                    value={"TEMPLATE" satisfies PersistenceType}
+                                >
                                     <Tooltip title="Template token (template must be updated manually)">
                                         <Group fontSize="small" />
                                     </Tooltip>
@@ -213,13 +216,10 @@ function TokenCard({
                             <IconButton
                                 size="small"
                                 onClick={() => {
-                                    const newName = prompt(
-                                        "New name:",
-                                        token.name,
-                                    );
+                                    const newName = prompt("New name:", name);
                                     if (newName) {
                                         if (newName.length < 50) {
-                                            setName(token.imageUrl, newName);
+                                            setName(key, newName);
                                         }
                                     }
                                 }}
@@ -233,10 +233,10 @@ function TokenCard({
                                 size="small"
                                 onClick={() => {
                                     const ok = window.confirm(
-                                        `Remove token "${token.name}"?`,
+                                        `Remove token "${name}"?`,
                                     );
                                     if (ok) {
-                                        removeToken(token.imageUrl);
+                                        removeToken(key);
                                     }
                                 }}
                                 aria-label="remove token"
@@ -254,16 +254,14 @@ function TokenCard({
                             <Switch
                                 checked={token.restoreAttachments}
                                 onChange={(_e, checked) =>
-                                    setRestoreAttachments(
-                                        token.imageUrl,
-                                        checked,
-                                    )
+                                    setRestoreAttachments(key, checked)
                                 }
                             />
                         </Control>
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
-                        Last modified {formatTimestamp(token.lastModified)}
+                        Last modified{" "}
+                        {formatTimestamp(persistedTokenGetLastModified(token))}
                     </Typography>
                 </Stack>
             </AccordionDetails>
@@ -284,7 +282,7 @@ export function Action() {
     const role = usePlayerStorage((s) => s.role);
     const tokens = usePlayerStorage((s) => s.tokens);
     const sizes = useMemo(
-        () => new Map(tokens.map((t) => [t.imageUrl, sizeof(t)])),
+        () => new Map(tokens.map((t) => [persistedTokenKey(t), sizeof(t)])),
         [tokens],
     );
     const totalSize = sum(sizes.values());
@@ -295,7 +293,7 @@ export function Action() {
     >({
         list: tokens,
         queryText: query,
-        getText: (item: PersistedToken) => [item.name],
+        getText: (t) => [persistedTokenGetName(t)],
         mapResultItem: (res: FuzzyResult<PersistedToken>) => ({
             token: res.item,
             highlightRanges: res.matches[0] ?? undefined,
@@ -358,16 +356,19 @@ export function Action() {
                     </Typography>
                 ) : (
                     <Stack spacing={2}>
-                        {filtered.map(({ token, highlightRanges }) => (
-                            <TokenCard
-                                key={token.imageUrl}
-                                expanded={expanded === token.imageUrl}
-                                setExpanded={setExpanded}
-                                token={token}
-                                size={sizes.get(token.imageUrl) ?? 0}
-                                highlightRanges={highlightRanges}
-                            />
-                        ))}
+                        {filtered.map(({ token, highlightRanges }) => {
+                            const key = persistedTokenKey(token);
+                            return (
+                                <TokenCard
+                                    key={key}
+                                    expanded={expanded === key}
+                                    setExpanded={setExpanded}
+                                    token={token}
+                                    size={sizes.get(key) ?? 0}
+                                    highlightRanges={highlightRanges}
+                                />
+                            );
+                        })}
                         <Typography color="textSecondary">
                             Right click a token to persist it.
                         </Typography>
