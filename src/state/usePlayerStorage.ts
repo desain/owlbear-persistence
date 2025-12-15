@@ -20,8 +20,8 @@ import {
     dateLte,
     persistedTokenGetName,
     persistedTokenKey,
-    persistedTokenSaveToken,
     persistedTokenSetName,
+    persistedTokenUpdate,
     type PersistedToken,
     type PersistenceType,
 } from "./PersistedToken";
@@ -35,6 +35,13 @@ interface LocalStorage {
         this: void,
         contextMenuEnabled: boolean,
     ) => void;
+    /**
+     * Persist all given tokens. If a token is already persisted uniquely, it will be
+     * skipped. If a token is already persisted as a template, and the given persistence
+     * type is 'TEMPLATE', the template will be updated.
+     * @param tokens Array of token, type to persist as, and attachments for the token
+     *               (undefined attachments means no attachments.
+     */
     readonly persist: (
         this: void,
         tokens: { token: Token; type: PersistenceType; attachments?: Item[] }[],
@@ -120,20 +127,26 @@ interface OwlbearStore {
     */
 }
 
+/**
+ * @returns Index of token with given key, -1 if not found; persisted token if extant, undefined otherwise
+ */
 export function getPersistedToken<T extends LocalStorage>(
     state: WritableDraft<T>,
     key: ImageContent["url"],
-): WritableDraft<T["tokens"][number]> | undefined {
-    return state.tokens.find((token) => persistedTokenKey(token) === key);
+): {
+    persistedTokenIdx: number;
+    persistedToken?: WritableDraft<T["tokens"][number]>;
+} {
+    const persistedTokenIdx = state.tokens.findIndex(
+        (token) => persistedTokenKey(token) === key,
+    );
+    const persistedToken = state.tokens[persistedTokenIdx];
+    return { persistedTokenIdx, persistedToken };
 }
 
-export function getPersistedTokenIndex<T extends LocalStorage>(
-    state: WritableDraft<T>,
-    key: ImageContent["url"],
-): number {
-    return state.tokens.findIndex((token) => persistedTokenKey(token) === key);
-}
-
+/**
+ * @yields Each parent of the given item.
+ */
 function* walkParents(items: Readonly<ItemMap>, item: Item) {
     const visited = new Set<Item["id"]>();
     let current: Item | undefined = item;
@@ -149,16 +162,27 @@ function* walkParents(items: Readonly<ItemMap>, item: Item) {
     }
 }
 
+/**
+ * @yields The token and persisted token info for each parent of the given item which is
+ *         persisted uniquely.
+ */
 function* walkParentPersistedUniqueTokens<S extends LocalStorage>(
     state: S,
     itemMap: ItemMap,
     item: Item,
-): Generator<{ token: Token; persistedToken: S["tokens"][number] }> {
+): Generator<{
+    token: Token;
+    persistedToken: S["tokens"][number];
+    persistedTokenIdx: number;
+}> {
     for (const current of walkParents(itemMap, item)) {
         if (isToken(current)) {
-            const persistedToken = getPersistedToken(state, current.image.url);
+            const { persistedToken, persistedTokenIdx } = getPersistedToken(
+                state,
+                current.image.url,
+            );
             if (persistedToken && persistedToken.type === "UNIQUE") {
-                yield { token: current, persistedToken };
+                yield { token: current, persistedToken, persistedTokenIdx };
             }
         }
     }
@@ -177,10 +201,8 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     set((state) => {
                         for (const { token, type, attachments } of tokens) {
                             // check if token is already persisted
-                            const persistedToken = getPersistedToken(
-                                state,
-                                tokenKey(token),
-                            );
+                            const { persistedTokenIdx, persistedToken } =
+                                getPersistedToken(state, tokenKey(token));
                             if (persistedToken?.type === "UNIQUE") {
                                 console.warn("token is already persisted");
                                 continue;
@@ -189,12 +211,13 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                 type === "TEMPLATE"
                             ) {
                                 // update template
-                                persistedTokenSaveToken(
-                                    persistedToken,
-                                    token,
-                                    token.lastModified,
-                                    attachments,
-                                );
+                                state.tokens[persistedTokenIdx] =
+                                    persistedTokenUpdate(
+                                        persistedToken,
+                                        token,
+                                        token.lastModified,
+                                        attachments,
+                                    );
                             } else if (!persistedToken) {
                                 // no existing token
                                 state.tokens.push({
@@ -210,30 +233,43 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                     }),
                 setType: (key, type) =>
                     set((state) => {
-                        const token = getPersistedToken(state, key);
-                        if (token) {
-                            token.type = type;
+                        const { persistedToken } = getPersistedToken(
+                            state,
+                            key,
+                        );
+                        if (persistedToken) {
+                            persistedToken.type = type;
                         }
                     }),
                 setTokenName: (key, name) =>
                     set((state) => {
-                        const token = getPersistedToken(state, key);
-                        if (token) {
-                            persistedTokenSetName(token, name);
+                        const { persistedToken } = getPersistedToken(
+                            state,
+                            key,
+                        );
+                        if (persistedToken) {
+                            persistedTokenSetName(persistedToken, name);
                         }
                     }),
                 setTokenRestoreAttachments: (key, restoreAttachments) =>
                     set((state) => {
-                        const token = getPersistedToken(state, key);
-                        if (token) {
-                            token.restoreAttachments = restoreAttachments;
+                        const { persistedToken } = getPersistedToken(
+                            state,
+                            key,
+                        );
+                        if (persistedToken) {
+                            persistedToken.restoreAttachments =
+                                restoreAttachments;
                         }
                     }),
                 removeToken: (key) =>
                     set((state) => {
-                        const idx = getPersistedTokenIndex(state, key);
-                        if (idx >= 0) {
-                            state.tokens.splice(idx, 1);
+                        const { persistedTokenIdx } = getPersistedToken(
+                            state,
+                            key,
+                        );
+                        if (persistedTokenIdx > -1) {
+                            state.tokens.splice(persistedTokenIdx, 1);
                         }
                     }),
 
@@ -276,6 +312,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                             token: Token;
                             lastModified: string;
                             uniquePersistedToken: WritableDraft<PersistedToken>;
+                            persistedTokenIdx: number;
                         }
                         const updatedUniqueTokens = new Map<
                             Token["id"],
@@ -285,25 +322,24 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                          * Mark a unique token as updated. If it's already marked, the last modified date will be the
                          * max of the current date and the input date.
                          */
-                        const addUpdatedUniqueToken = ({
-                            token,
-                            lastModified,
-                            uniquePersistedToken,
-                        }: UpdatedUniqueToken) => {
-                            const existing = updatedUniqueTokens.get(token.id);
+                        const addUpdatedUniqueToken = (
+                            uniquePersistedToken: UpdatedUniqueToken,
+                        ) => {
+                            const existing = updatedUniqueTokens.get(
+                                uniquePersistedToken.token.id,
+                            );
                             if (existing) {
                                 existing.lastModified = dateLte(
                                     existing.lastModified,
-                                    lastModified,
+                                    uniquePersistedToken.lastModified,
                                 )
-                                    ? lastModified
+                                    ? uniquePersistedToken.lastModified
                                     : existing.lastModified;
                             } else {
-                                updatedUniqueTokens.set(token.id, {
-                                    token,
-                                    lastModified,
+                                updatedUniqueTokens.set(
+                                    uniquePersistedToken.token.id,
                                     uniquePersistedToken,
-                                });
+                                );
                             }
                         };
                         const newTokens: Token[] = [];
@@ -331,6 +367,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                             for (const {
                                 token,
                                 persistedToken: uniquePersistedToken,
+                                persistedTokenIdx,
                             } of walkParentPersistedUniqueTokens(
                                 state,
                                 state.items,
@@ -345,6 +382,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                     token,
                                     lastModified,
                                     uniquePersistedToken,
+                                    persistedTokenIdx,
                                 });
                             }
                         }
@@ -356,6 +394,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                 for (const {
                                     token,
                                     persistedToken: uniquePersistedToken,
+                                    persistedTokenIdx,
                                 } of walkParentPersistedUniqueTokens(
                                     state,
                                     state.items,
@@ -366,6 +405,7 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                         token,
                                         lastModified: new Date().toISOString(),
                                         uniquePersistedToken,
+                                        persistedTokenIdx,
                                     });
                                 }
                             }
@@ -376,15 +416,17 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                             token,
                             lastModified,
                             uniquePersistedToken,
+                            persistedTokenIdx,
                         } of updatedUniqueTokens.values()) {
                             // Is there exactly one of this token in the map to pull from?
                             if (state.keyUsage.get(tokenKey(token)) === 1) {
-                                persistedTokenSaveToken(
-                                    uniquePersistedToken,
-                                    token,
-                                    lastModified,
-                                    getAllAttachments(state.items, token),
-                                );
+                                state.tokens[persistedTokenIdx] =
+                                    persistedTokenUpdate(
+                                        uniquePersistedToken,
+                                        token,
+                                        lastModified,
+                                        getAllAttachments(state.items, token),
+                                    );
                             } else {
                                 console.warn(
                                     `skipping updating unique token ${persistedTokenGetName(

@@ -46,7 +46,7 @@ export async function applyPersisted(tokens: Token[], overwrite?: boolean) {
     const oldAttachmentsToDelete: Item["id"][] = [];
     const newAttachmentsToAdd: Item[] = [];
     for (const token of tokens) {
-        const persistedToken = getPersistedToken(state, token.image.url);
+        const { persistedToken } = getPersistedToken(state, token.image.url);
         if (persistedToken) {
             updates.set(token.id, persistedToken);
 

@@ -42,32 +42,24 @@ export function persistedTokenKey(persistedToken: PersistedToken) {
         : persistedToken.imageUrl;
 }
 
-export function persistedTokenSaveToken(
-    persistedToken: WritableDraft<PersistedToken>,
+export function persistedTokenUpdate(
+    { restoreAttachments, type }: Readonly<PersistedToken>,
     token: Token,
     lastModified: string,
     attachments?: Item[],
-) {
-    persistedTokenSetLastModified(persistedToken, lastModified);
-    persistedTokenSetMetadata(persistedToken, token.metadata);
-    persistedToken.attachments = processAttachments(token, attachments);
+): PersistedToken {
+    return {
+        attachments: processAttachments(token, attachments),
+        restoreAttachments,
+        type,
+        token: { ...token, lastModified },
+    };
 }
 
 export function persistedTokenGetMetadata(persistedToken: PersistedToken) {
     return persistedTokenFull(persistedToken)
         ? persistedToken.token.metadata
         : persistedToken.metadata;
-}
-
-export function persistedTokenSetMetadata(
-    persistedToken: WritableDraft<PersistedToken>,
-    metadata: Metadata,
-) {
-    if (persistedTokenFull(persistedToken)) {
-        persistedToken.token.metadata = metadata as Token["metadata"];
-    } else {
-        persistedToken.metadata = metadata;
-    }
 }
 
 export function persistedTokenGetName(
@@ -93,17 +85,6 @@ export function persistedTokenGetLastModified(persistedToken: PersistedToken) {
     return persistedTokenFull(persistedToken)
         ? new Date(persistedToken.token.lastModified)
         : new Date(persistedToken.lastModified);
-}
-
-export function persistedTokenSetLastModified(
-    persistedToken: WritableDraft<PersistedToken>,
-    lastModified: string,
-) {
-    if (persistedTokenFull(persistedToken)) {
-        persistedToken.token.lastModified = lastModified;
-    } else {
-        persistedToken.lastModified = Date.parse(lastModified);
-    }
 }
 
 export function dateLte(a: string | Date, b: string | Date) {
