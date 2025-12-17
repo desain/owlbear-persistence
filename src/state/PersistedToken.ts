@@ -10,14 +10,35 @@ import {
 import { isToken, tokenKey, type Token } from "../Token";
 import { processAttachments } from "../action/processAttachments";
 
+const PERSISTED_PROPERTIES = [
+    "METADATA",
+    "ATTACHMENTS",
+    "TEXT",
+    "LAYER",
+    "DESCRIPTION",
+] as const;
+
+export type PersistedProperty = (typeof PERSISTED_PROPERTIES)[number];
+
+export function isPersistedProperty(p: unknown): p is PersistedProperty {
+    const pp: readonly unknown[] = PERSISTED_PROPERTIES;
+    return pp.includes(p);
+}
+
+export function invertPersistedProperties(
+    props?: readonly PersistedProperty[],
+): PersistedProperty[] {
+    return PERSISTED_PROPERTIES.filter((p) => !props?.includes(p));
+}
+
 interface PersistedTokenBase {
     readonly attachments?: Item[];
     /**
-     * Whether to restore the token's attachments when restoring it.
-     * Optional for backwards compatibility. If not present, read
-     * as true.
+     * Properties to NOT restore. Should contain each property at most once.
+     * If not present, treat as empty.
+     * Array, not Set, for serialization.
      */
-    readonly restoreAttachments?: boolean;
+    readonly disabledProperties?: PersistedProperty[];
     /**
      * Which groups the token is in. Read undefined as no groups.
      */
@@ -93,7 +114,7 @@ export function persistedTokenKey(persistedToken: PersistedToken) {
 }
 
 export function persistedTokenUpdate(
-    { restoreAttachments, type, groups }: Readonly<PersistedToken>,
+    { disabledProperties, type, groups }: PersistedToken,
     token: Token,
     lastModified: string,
     attachments?: Item[],
@@ -101,7 +122,7 @@ export function persistedTokenUpdate(
     return {
         type,
         groups,
-        restoreAttachments,
+        disabledProperties,
         token: { ...token, lastModified },
         attachments: processAttachments(token, attachments),
     };

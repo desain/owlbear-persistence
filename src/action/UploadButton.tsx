@@ -48,8 +48,11 @@ const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                 return;
             }
             importTokens(importedTokens);
+            const plural = importedTokens.length !== 1;
             void OBR.notification.show(
-                `Successfully uploaded ${importedTokens.length} tokens`,
+                `Successfully uploaded ${importedTokens.length} token${
+                    plural ? "s" : ""
+                }`,
                 "SUCCESS",
             );
         } catch (e) {

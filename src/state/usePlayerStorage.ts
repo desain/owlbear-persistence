@@ -56,10 +56,10 @@ interface LocalStorage {
         key: ImageContent["url"],
         name: string,
     ) => void;
-    readonly setTokenRestoreAttachments: (
+    readonly setTokenDisabledProperties: (
         this: void,
         key: ImageContent["url"],
-        restoreAttachments: boolean,
+        disabledProperties: PersistedToken["disabledProperties"],
     ) => void;
     readonly removeToken: (this: void, key: ImageContent["url"]) => void;
     readonly importTokens: (this: void, tokens: PersistedToken[]) => void;
@@ -252,15 +252,15 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                             persistedTokenSetName(persistedToken, name);
                         }
                     }),
-                setTokenRestoreAttachments: (key, restoreAttachments) =>
+                setTokenDisabledProperties: (key, disabledProperties) =>
                     set((state) => {
                         const { persistedToken } = getPersistedToken(
                             state,
                             key,
                         );
                         if (persistedToken) {
-                            persistedToken.restoreAttachments =
-                                restoreAttachments;
+                            persistedToken.disabledProperties =
+                                disabledProperties;
                         }
                     }),
                 removeToken: (key) =>
@@ -357,6 +357,11 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                 );
                             }
                         };
+
+                        /**
+                         * Tokens that were either just dragged out onto the map, or were just
+                         * seen for the first time after a scene load.
+                         */
                         const newTokens: Token[] = [];
 
                         // Update persisted tokens
@@ -405,7 +410,10 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                         // Look for deleted attachments
                         for (const item of prevItems.values()) {
                             if (!state.items.has(item.id)) {
-                                // item was deleted
+                                // item was deleted. Mark all its parents that are persisted uniquely as
+                                // needing an update
+                                // TODO should this look up parents in prevItems instead? And mark
+                                // items in the current set as updated if they still exist?
                                 for (const {
                                     token,
                                     persistedToken: uniquePersistedToken,
@@ -415,7 +423,6 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                     state.items,
                                     item,
                                 )) {
-                                    // does the parent still exist? if so, mark it for updating.
                                     addUpdatedUniqueToken({
                                         token,
                                         lastModified: new Date().toISOString(),
@@ -433,8 +440,10 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                             uniquePersistedToken,
                             persistedTokenIdx,
                         } of updatedUniqueTokens.values()) {
+                            const usage =
+                                state.keyUsage.get(tokenKey(token)) ?? 0;
                             // Is there exactly one of this token in the map to pull from?
-                            if (state.keyUsage.get(tokenKey(token)) === 1) {
+                            if (usage === 1) {
                                 state.tokens[persistedTokenIdx] =
                                     persistedTokenUpdate(
                                         uniquePersistedToken,
@@ -442,16 +451,16 @@ export const usePlayerStorage = create<LocalStorage & OwlbearStore>()(
                                         lastModified,
                                         getAllAttachments(state.items, token),
                                     );
-                            } else {
+                            } else if (usage > 1) {
                                 console.warn(
                                     `skipping updating unique token ${persistedTokenGetName(
                                         uniquePersistedToken,
                                     )} due to too many identical tokens`,
                                 );
-                            }
+                            } // else if it's 0, the unique token was deleted
                         }
 
-                        // Populate new tokens from persisted data
+                        // Populate tokens from persisted data
                         if (state.role === "GM") {
                             void applyPersisted(newTokens);
                         }

@@ -190,7 +190,7 @@ function installTemplateContextMenus(tokens: PersistedToken[]) {
                 }
 
                 await applyPersisted(items.filter(isToken), true);
-                const plural = items.length > 1;
+                const plural = items.length !== 1;
                 void OBR.player.deselect();
                 void OBR.notification.show(
                     `Reset item${plural ? "s" : ""} to template`,

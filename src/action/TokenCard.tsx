@@ -1,9 +1,13 @@
 import {
+    Attachment,
     DeleteOutline,
+    Description,
     Edit,
     ExpandMore,
     Group,
+    Layers,
     Person,
+    TextFields,
     Warning,
 } from "@mui/icons-material";
 import {
@@ -16,7 +20,6 @@ import {
     CardMedia,
     IconButton,
     Stack,
-    Switch,
     ToggleButton,
     ToggleButtonGroup,
     Typography,
@@ -28,9 +31,12 @@ import { filesize } from "filesize";
 import { Control, getId } from "owlbear-utils";
 import type React from "react";
 import {
+    invertPersistedProperties,
+    persistedTokenFull,
     persistedTokenGetLastModified,
     persistedTokenGetName,
     persistedTokenKey,
+    type PersistedProperty,
     type PersistedToken,
     type PersistenceType,
 } from "../state/PersistedToken";
@@ -65,8 +71,8 @@ export const TokenCard: React.FC<TokenCardProps> = ({
 }) => {
     const setType = usePlayerStorage((s) => s.setType);
     const setName = usePlayerStorage((s) => s.setTokenName);
-    const setRestoreAttachments = usePlayerStorage(
-        (s) => s.setTokenRestoreAttachments,
+    const setDisabledProperties = usePlayerStorage(
+        (s) => s.setTokenDisabledProperties,
     );
     const removeToken = usePlayerStorage((s) => s.removeToken);
     const keyUsage = usePlayerStorage((s) => s.keyUsage);
@@ -167,6 +173,8 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                         direction="row"
                         alignItems="center"
                         justifyContent="space-between"
+                        flexWrap="wrap"
+                        rowGap={2}
                     >
                         <Control label="Persistence">
                             <ToggleButtonGroup
@@ -225,20 +233,59 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                                 <DeleteOutline fontSize="small" />
                             </IconButton>
                         </Control>
-                    </Stack>
-                    <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                    >
-                        <Control label="Save attachments?">
-                            <Switch
-                                checked={token.restoreAttachments ?? true}
-                                onChange={(_e, checked) =>
-                                    setRestoreAttachments(key, checked)
-                                }
-                            />
-                        </Control>
+                        {persistedTokenFull(token) && (
+                            <Control label="Persisted properties">
+                                <ToggleButtonGroup
+                                    value={invertPersistedProperties(
+                                        token.disabledProperties,
+                                    )}
+                                    onChange={(
+                                        _e,
+                                        allowProps: PersistedProperty[],
+                                    ) =>
+                                        setDisabledProperties(
+                                            key,
+                                            invertPersistedProperties(
+                                                allowProps,
+                                            ),
+                                        )
+                                    }
+                                >
+                                    <ToggleButton
+                                        title="Attachments"
+                                        value={
+                                            "ATTACHMENTS" satisfies PersistedProperty
+                                        }
+                                    >
+                                        <Attachment />
+                                    </ToggleButton>
+                                    <ToggleButton
+                                        title="Text"
+                                        value={
+                                            "TEXT" satisfies PersistedProperty
+                                        }
+                                    >
+                                        <TextFields />
+                                    </ToggleButton>
+                                    <ToggleButton
+                                        title="Description"
+                                        value={
+                                            "DESCRIPTION" satisfies PersistedProperty
+                                        }
+                                    >
+                                        <Description />
+                                    </ToggleButton>
+                                    <ToggleButton
+                                        title="Layer"
+                                        value={
+                                            "LAYER" satisfies PersistedProperty
+                                        }
+                                    >
+                                        <Layers />
+                                    </ToggleButton>
+                                </ToggleButtonGroup>
+                            </Control>
+                        )}
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
                         Last modified{" "}
