@@ -15,6 +15,7 @@ export function processAttachments(
             attachment.attachedTo === token.id
                 ? ATTACHED_TO_ROOT
                 : attachment.attachedTo,
+        zIndex: attachment.zIndex - token.zIndex,
         position: {
             x: attachment.position.x - token.position.x,
             y: attachment.position.y - token.position.y,
@@ -41,6 +42,7 @@ export function restoreAttachments(
         attachedTo: attachment.attachedTo
             ? idMap.get(attachment.attachedTo)
             : undefined,
+        zIndex: attachment.zIndex + token.zIndex,
         id: idMap.get(attachment.id) ?? attachment.id,
         position: {
             x: attachment.position.x + token.position.x,
