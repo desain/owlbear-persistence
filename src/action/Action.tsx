@@ -36,7 +36,7 @@ export const Action: React.FC = () => {
     const [query, setQuery] = useState("");
     const [searchExpanded, setSearchExpanded] = useState(false);
 
-    const BASE_HEIGHT = 50;
+    const BASE_HEIGHT = 200;
     const MAX_HEIGHT = 700;
     const box = useActionResizer(BASE_HEIGHT, MAX_HEIGHT);
     useRehydrate(usePlayerStorage);
