@@ -48,6 +48,7 @@ function updateFromPersisted(
         !persistedToken.disabledProperties?.includes("TEXT")
     ) {
         token.text = persistedToken.token.text;
+        token.textItemType = persistedToken.token.textItemType;
     }
 
     if (
