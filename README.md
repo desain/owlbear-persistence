@@ -2,7 +2,8 @@
 
 Persist token data between scenes and create token templates.
 
-![Hero image](https://owlbear-persistence.nicholassdesai.workers.dev/hero.gif)
+<img width="720" height="391" alt="Hero Image" src="https://owlbear-persistence.nicholassdesai.workers.dev/hero.gif" />
+
 
 ## Features
 
