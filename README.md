@@ -2,9 +2,11 @@
 
 Persist token data between scenes and create token templates.
 
+![Hero image](https://owlbear-persistence.nicholassdesai.workers.dev/hero.gif)
+
 ## Features
 
--   💾 Persist token metadata, attachments, and more between scenes.
+-   💾 Persist token text, metadata, and attachments between scenes.
 -   ♊️ Create token templates to apply metadata and attachments when tokens are created.
 
 ## How to use
