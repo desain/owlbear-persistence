@@ -1,7 +1,7 @@
 {
   "name": "Persistent Tokens",
   "description": "Persist token data between scenes and create token templates.",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "manifest_version": 1,
   "author": "desain",
   "icon": "/logo.png",
