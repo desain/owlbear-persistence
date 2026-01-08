@@ -43,6 +43,10 @@ export const Action: React.FC = () => {
 
     const role = usePlayerStorage((s) => s.role);
     const tokens = usePlayerStorage((s) => s.tokens);
+    const contextMenuEnabled = usePlayerStorage((s) => s.contextMenuEnabled);
+    const rightClickMessage = contextMenuEnabled
+        ? "Right click a token to persist it."
+        : "Enable the context menu in Settings and right click a token to persist it.";
     const sizes = useMemo(
         () => new Map(tokens.map((t) => [persistedTokenKey(t), sizeof(t)])),
         [tokens],
@@ -148,14 +152,14 @@ export const Action: React.FC = () => {
 
                 {tokens.length === 0 ? (
                     <Typography color="text.secondary">
-                        No tokens saved. Right click a token to persist it.
+                        No tokens saved. {rightClickMessage}
                     </Typography>
                 ) : filtered.length === 0 ? (
                     <Typography color="text.secondary">
                         No results found.
                     </Typography>
                 ) : (
-                    <Stack spacing={2}>
+                    <Stack>
                         {filtered.map(({ token, highlightRanges }) => {
                             const key = persistedTokenKey(token);
                             return (
@@ -169,8 +173,8 @@ export const Action: React.FC = () => {
                                 />
                             );
                         })}
-                        <Typography color="textSecondary">
-                            Right click a token to persist it.
+                        <Typography sx={{ mt: 2 }} color="textSecondary">
+                            {rightClickMessage}
                         </Typography>
                     </Stack>
                 )}

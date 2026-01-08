@@ -1,8 +1,6 @@
 import {
     Attachment,
-    DeleteOutline,
     Description,
-    Edit,
     ExpandMore,
     Group,
     Layers,
@@ -10,15 +8,19 @@ import {
     TextFields,
     Warning,
 } from "@mui/icons-material";
+import DeleteOutline from "@mui/icons-material/DeleteOutline";
+import Edit from "@mui/icons-material/Edit";
 import {
     Accordion,
+    AccordionActions,
     AccordionDetails,
     AccordionSummary,
     Alert,
     Badge,
+    Box,
+    Button,
     CardHeader,
     CardMedia,
-    IconButton,
     Stack,
     ToggleButton,
     ToggleButtonGroup,
@@ -126,7 +128,11 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                 expandIcon={<ExpandMore />}
                 slotProps={{ content: { sx: { m: 0 } } }}
             >
-                <Stack direction="row" alignItems="center">
+                <Stack
+                    direction="row"
+                    alignItems="center"
+                    sx={{ width: "100%" }}
+                >
                     {hasWarning ? (
                         <Badge
                             color="warning"
@@ -159,6 +165,7 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                             },
                         }}
                     />
+                    <Box sx={{ flexGrow: 1 }} />
                 </Stack>
             </AccordionSummary>
             <AccordionDetails>
@@ -176,7 +183,7 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                         flexWrap="wrap"
                         rowGap={2}
                     >
-                        <Control label="Persistence">
+                        <Control label="Persistence Type">
                             <ToggleButtonGroup
                                 size="small"
                                 exclusive
@@ -192,46 +199,16 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                                     value={"UNIQUE" satisfies PersistenceType}
                                 >
                                     <Person fontSize="small" />
+                                    unique
                                 </ToggleButton>
                                 <ToggleButton
                                     title="Template token (template must be updated manually)"
                                     value={"TEMPLATE" satisfies PersistenceType}
                                 >
                                     <Group fontSize="small" />
+                                    template
                                 </ToggleButton>
                             </ToggleButtonGroup>
-                        </Control>
-                        <Control label="Rename">
-                            <IconButton
-                                size="small"
-                                onClick={() => {
-                                    const newName = prompt("New name:", name);
-                                    if (newName) {
-                                        if (newName.length < 50) {
-                                            setName(key, newName);
-                                        }
-                                    }
-                                }}
-                                aria-label="remove token"
-                            >
-                                <Edit fontSize="small" />
-                            </IconButton>
-                        </Control>
-                        <Control label="Delete">
-                            <IconButton
-                                size="small"
-                                onClick={() => {
-                                    const ok = window.confirm(
-                                        `Stop persisting token "${name}"?`,
-                                    );
-                                    if (ok) {
-                                        removeToken(key);
-                                    }
-                                }}
-                                aria-label="remove token"
-                            >
-                                <DeleteOutline fontSize="small" />
-                            </IconButton>
                         </Control>
                         {persistedTokenFull(token) && (
                             <Control label="Persisted properties">
@@ -293,6 +270,39 @@ export const TokenCard: React.FC<TokenCardProps> = ({
                     </Typography>
                 </Stack>
             </AccordionDetails>
+            <AccordionActions>
+                <Button
+                    size="small"
+                    startIcon={<Edit />}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const newName = prompt("New name:", name);
+                        if (newName) {
+                            if (newName.length < 50) {
+                                setName(key, newName);
+                            }
+                        }
+                    }}
+                >
+                    Rename
+                </Button>
+
+                <Button
+                    size="small"
+                    startIcon={<DeleteOutline />}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const ok = window.confirm(
+                            `Stop persisting token "${name}"?`,
+                        );
+                        if (ok) {
+                            removeToken(key);
+                        }
+                    }}
+                >
+                    Delete
+                </Button>
+            </AccordionActions>
         </Accordion>
     );
 };
